@@ -1,25 +1,39 @@
 import pygame
 pygame.init ()
-
-window = pygame.display.set_mode((1000,600))
-
+# define o tamanho da tela do jogo
+window = pygame.display.set_mode((500,750))
+# nome do jogo
 pygame.display.set_caption('Jogo da MariAna')
 
-game = True
-
+# define  a cor e a fonte  do nome do jogo
 font = pygame.font.SysFont("Cambria", 60)
 text = font.render('SKY', True, (128, 0, 128))
 text_ = font.render('HOPPER', True, (128, 0, 128))
 
+image=pygame.image.load('fundo.png').convert()
+
+game = True
+
 while game:
     for event in pygame.event.get():
+        #se apertar o espaço o jogo fecha
         if event.type == pygame.KEYUP:
             pygame.quit()
             game = False
+# cor do fundo do jogo 
 
     window.fill((200,162,200))
-    window.blit(text, (450, 200))
-    window.blit(text_, (400, 250))
-    pygame.display.update()
+    window.fill((200,162,200))
+# imagem de fundo 
+    image = pygame.transform.scale(image,(500,750))
+    window.blit(image,(0,0))
 
+# posiciona o texto na tela do jogo
+    window.blit(text, (200, 300))
+    window.blit(text_, (150, 350))
+
+
+
+    pygame.display.update()
 pygame.quit()
+
