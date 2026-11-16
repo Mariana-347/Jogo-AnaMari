@@ -7,6 +7,10 @@ pygame.display.set_caption('Jogo da MariAna')
 
 game = True
 
+font = pygame.font.SysFont("Cambria", 60)
+text = font.render('SKY', True, (128, 0, 128))
+text_ = font.render('HOPPER', True, (128, 0, 128))
+
 while game:
     for event in pygame.event.get():
         if event.type == pygame.KEYUP:
@@ -14,5 +18,8 @@ while game:
             game = False
 
     window.fill((200,162,200))
+    window.blit(text, (450, 200))
+    window.blit(text_, (400, 250))
     pygame.display.update()
+
 pygame.quit()
