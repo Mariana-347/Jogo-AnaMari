@@ -15,11 +15,32 @@ font = pygame.font.SysFont("Cambria", 60)
 text = font.render('SKY', True, (128, 0, 128))
 text_ = font.render('HOPPER', True, (128, 0, 128))
 
-MATINHO_WIDTH = 100
-MATINHO_HEIGHT = 100
+MATINHO_WIDTH = 50
+MATINHO_HEIGHT = 50
+PASCAL_WIDTH = 100
+PASCAL_HEIGHT = 100
 background=pygame.image.load('fundo.png').convert()
 matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
 matinho_img_small = pygame.transform.scale(matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT))
+ship_img = pygame.image.load('pascal.png').convert_alpha()
+ship_img = pygame.transform.scale(ship_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
+
+class Ship(pygame.sprite.Sprite):
+    def __init__(self, img):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.centerx = WIDTH / 2
+        self.rect.bottom = HEIGHT - 10
+        self.speedx = 0
+
+    def update(self):
+        self.rect.x += self.speedx
+        # Mantem dentro da tela
+        if self.rect.right > WIDTH:
+            self.rect.right = WIDTH
+        if self.rect.left < 0:
+            self.rect.left = 0
 
 # cria novas plataformas (matinhos)
 class matinho(pygame.sprite.Sprite):
@@ -47,18 +68,26 @@ clock = pygame.time.Clock()
 
 game = True
 
+# Criando um grupo de matinhos
+all_sprites = pygame.sprite.Group()
+# Criando o jogador
+player = Ship(ship_img)
+all_sprites.add(player)
+# Criando os matinhos
+for i in range(4):
+    matinhos = matinho(matinho_img)
+    all_sprites.add(matinhos)
+
 while game:
     clock.tick(15)
     for event in pygame.event.get():
         #se apertar o espaço o jogo fecha
-        if event.type == pygame.KEYUP:
-            pygame.quit()
-            game = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                game = False
 
     # atualiza as posicoes dos matinhos
-    matinho1.update()
-    matinho2.update()
-    matinho3.update()
+    all_sprites.update()
     
     # cor do fundo do jogo 
     window.fill((200, 162, 200))
@@ -68,9 +97,7 @@ while game:
     window.blit(image,(0, 0))
 
     # desenhando os matinhos
-    window.blit(matinho1.image, matinho1.rect)
-    window.blit(matinho2.image, matinho2.rect)
-    window.blit(matinho3.image, matinho3.rect)
+    all_sprites.draw(window)
  
     # posiciona o texto na tela do jogo
     # window.blit(text, (200, 300))
