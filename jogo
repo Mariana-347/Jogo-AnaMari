@@ -1,10 +1,12 @@
 import pygame
 import random
 pygame.init ()
+
 # define o tamanho da tela do jogo
 WIDTH = 500
 HEIGHT = 750
 window = pygame.display.set_mode((WIDTH, HEIGHT))
+
 # nome do jogo
 pygame.display.set_caption('Jogo da MariAna')
 
@@ -13,45 +15,68 @@ font = pygame.font.SysFont("Cambria", 60)
 text = font.render('SKY', True, (128, 0, 128))
 text_ = font.render('HOPPER', True, (128, 0, 128))
 
-MATINHO_WIDTH = 50
-MATINHO_HEIGHT = 38
+MATINHO_WIDTH = 100
+MATINHO_HEIGHT = 100
 background=pygame.image.load('fundo.png').convert()
 matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
 matinho_img_small = pygame.transform.scale(matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT))
 
+# cria novas plataformas (matinhos)
+class matinho(pygame.sprite.Sprite):
+    def __init__(self, img):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, WIDTH)
+        self.rect.y = 0
+        self.speedy = 5
+
+    def update(self):
+        # Atualizando a posição do meteoro
+        self.rect.y += self.speedy
+        if self.rect.y > 750:
+            self.rect.x = random.randint(0, WIDTH)
+            self.rect.y = 0
+
+# posiciona matinhos
+matinho1 = matinho(matinho_img_small)
+matinho2 = matinho(matinho_img_small)
+matinho3 = matinho(matinho_img_small)
+
+clock = pygame.time.Clock()
+
 game = True
 
-# posiciona matinho
-matinho_x = random.randint(0, WIDTH-MATINHO_WIDTH)
-matinho_y = random.randint(0, HEIGHT-MATINHO_HEIGHT)
-matinho_speedy = -5
-
 while game:
+    clock.tick(15)
     for event in pygame.event.get():
         #se apertar o espaço o jogo fecha
         if event.type == pygame.KEYUP:
             pygame.quit()
             game = False
 
-    matinho_y += matinho_speedy
-
-    if matinho_y > HEIGHT or matinho_x + MATINHO_WIDTH < 0 or matinho_x > WIDTH:
-        matinho_x = random.randint(0, WIDTH-MATINHO_WIDTH)
-        matinho_y = -MATINHO_HEIGHT
+    # atualiza as posicoes dos matinhos
+    matinho1.update()
+    matinho2.update()
+    matinho3.update()
     
     # cor do fundo do jogo 
-    window.fill((200,162,200))
-    window.fill((200,162,200))
-# imagem de fundo 
-    image = pygame.transform.scale(background,(500,750))
-    window.blit(image,(0,0))
+    window.fill((200, 162, 200))
+    window.fill((200, 162, 200))
+    # imagem de fundo 
+    image = pygame.transform.scale(background,(500, 750))
+    window.blit(image,(0, 0))
 
-# posiciona o texto na tela do jogo
-    window.blit(text, (200, 300))
-    window.blit(text_, (150, 350))
-
-    window.blit(background, (0, 0))
-    window.blit(matinho_img_small, (matinho_x, matinho_y))
+    # desenhando os matinhos
+    window.blit(matinho1.image, matinho1.rect)
+    window.blit(matinho2.image, matinho2.rect)
+    window.blit(matinho3.image, matinho3.rect)
+ 
+    # posiciona o texto na tela do jogo
+    # window.blit(text, (200, 300))
+    # window.blit(text_, (150, 350))
+    # window.blit(background, (0, 0))
+    # window.blit(matinho_img_small, (matinho_x, matinho_y))
 
     pygame.display.update()
 pygame.quit()
