@@ -10,7 +10,7 @@ window = pygame.display.set_mode((WIDTH, HEIGHT))
 # nome do jogo
 pygame.display.set_caption('Jogo da MariAna')
 
-# define  a cor e a fonte  do nome do jogo
+# define a cor e a fonte do nome do jogo
 font = pygame.font.SysFont("Cambria", 60)
 text = font.render('SKY', True, (128, 0, 128))
 text_ = font.render('HOPPER', True, (128, 0, 128))
@@ -19,11 +19,15 @@ MATINHO_WIDTH = 120
 MATINHO_HEIGHT = 120
 PASCAL_WIDTH = 100
 PASCAL_HEIGHT = 100
-background=pygame.image.load('fundo.png').convert()
+background = pygame.image.load('fundo.png').convert()
 matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
-matinho_img_small = pygame.transform.scale(matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT))
+matinho_img_small = pygame.transform.scale(
+    matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT)
+)
 ship_img = pygame.image.load('pascal.png').convert_alpha()
-ship_img = pygame.transform.scale(ship_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
+ship_img = pygame.transform.scale(
+    ship_img, (PASCAL_WIDTH, PASCAL_HEIGHT)
+)
 
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
@@ -50,20 +54,18 @@ class Ship(pygame.sprite.Sprite):
 
 # cria novas plataformas (matinhos)
 class matinho(pygame.sprite.Sprite):
-    def __init__(self, img):
+    def __init__(self, img, y):
         pygame.sprite.Sprite.__init__(self)
         self.image = img
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(0, WIDTH - self.rect.width)
-        self.rect.y = 0
+        self.rect.y = y
         self.speedy = 5
 
     def update(self):
-        # Atualizando a posição do matinho
-        self.rect.y += self.speedy
-        if self.rect.y > 750:
-            self.rect.x = random.randint(0, WIDTH - self.rect.width)
-            self.rect.y = 0
+        # Só desce enquanto o personagem está se movimentando
+        if player.speedx != 0 or player.speedy != 0:
+            self.rect.y += self.speedy
 
 clock = pygame.time.Clock()
 
@@ -71,18 +73,31 @@ game = True
 
 # Criando um grupo de matinhos
 all_sprites = pygame.sprite.Group()
+plataformas = pygame.sprite.Group()
+
 # Criando o jogador
 player = Ship(ship_img)
 all_sprites.add(player)
-# Criando os matinhos
-for i in range(3):
-    matinhos = matinho(matinho_img_small)
-    all_sprites.add(matinhos)
+
+# Criando os matinhos: duas plataformas em cada altura
+for i in range(10):
+    y = HEIGHT - 140 - i * 140
+
+    for coluna in range(2):
+        matinhos = matinho(matinho_img_small, y)
+
+        inicio = coluna * (WIDTH // 2)
+        fim = (coluna + 1) * (WIDTH // 2)
+
+        matinhos.rect.x = random.randint(inicio, fim - matinhos.rect.width)
+
+        plataformas.add(matinhos)
+        all_sprites.add(matinhos)
 
 while game:
     clock.tick(15)
     for event in pygame.event.get():
-        #se apertar o espaço o jogo fecha
+        # se apertar o espaço o jogo fecha
         if event.type == pygame.QUIT:
             game = False
         if event.type == pygame.KEYDOWN:
@@ -109,17 +124,37 @@ while game:
 
     # atualiza as posicoes dos matinhos
     all_sprites.update()
-    
-    # cor do fundo do jogo 
+
+    # Agrupa as plataformas que estão na mesma altura
+    linhas = {}
+
+    for plataforma in plataformas:
+        y = plataforma.rect.y
+        linhas.setdefault(y, []).append(plataforma)
+
+    # Reposiciona cada dupla que saiu por baixo
+    for y, linha in linhas.items():
+        if y > HEIGHT:
+            novo_y = min(plataforma.rect.y for plataforma in plataformas) - 140
+
+            for coluna, plataforma in enumerate(linha):
+                inicio = coluna * (WIDTH // 2)
+                fim = (coluna + 1) * (WIDTH // 2)
+
+                plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
+                plataforma.rect.y = novo_y
+
+    # cor do fundo do jogo
     window.fill((200, 162, 200))
     window.fill((200, 162, 200))
-    # imagem de fundo 
-    image = pygame.transform.scale(background,(500, 750))
-    window.blit(image,(0, 0))
+
+    # imagem de fundo
+    image = pygame.transform.scale(background, (500, 750))
+    window.blit(image, (0, 0))
 
     # desenhando os matinhos
     all_sprites.draw(window)
- 
+
     # posiciona o texto na tela do jogo
     # window.blit(text, (200, 300))
     # window.blit(text_, (150, 350))
@@ -127,4 +162,5 @@ while game:
     # window.blit(matinho_img_small, (matinho_x, matinho_y))
 
     pygame.display.update()
+
 pygame.quit()
