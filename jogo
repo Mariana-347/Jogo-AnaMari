@@ -1,5 +1,6 @@
 import pygame
 import random
+
 pygame.init ()
 
 # define o tamanho da tela do jogo
@@ -10,24 +11,28 @@ window = pygame.display.set_mode((WIDTH, HEIGHT))
 # nome do jogo
 pygame.display.set_caption('Jogo da MariAna')
 
-# define a cor e a fonte do nome do jogo
+# textos 
 font = pygame.font.SysFont("Cambria", 60)
 text = font.render('SKY', True, (128, 0, 128))
 text_ = font.render('HOPPER', True, (128, 0, 128))
 
+# tamanho das imagens
 MATINHO_WIDTH = 120
 MATINHO_HEIGHT = 120
 PASCAL_WIDTH = 100
 PASCAL_HEIGHT = 100
-background = pygame.image.load('fundo.png').convert()
+
+# imagem de fundo
+background=pygame.image.load('fundo.png').convert()
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+
+# imagem do matinho (plataforma)
 matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
-matinho_img_small = pygame.transform.scale(
-    matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT)
-)
-ship_img = pygame.image.load('pascal.png').convert_alpha()
-ship_img = pygame.transform.scale(
-    ship_img, (PASCAL_WIDTH, PASCAL_HEIGHT)
-)
+matinho_img_small = pygame.transform.scale(matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT))
+
+# imagem do pascal (personagem)
+pascal_img = pygame.image.load('pascal.png').convert_alpha()
+pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
@@ -38,19 +43,31 @@ class Ship(pygame.sprite.Sprite):
         self.rect.bottom = HEIGHT - 10
         self.speedx = 0
         self.speedy = 0
+        self.no_chao = True
+        self.bottom_anterior = self.rect.bottom
 
     def update(self):
+        # Guarda a posição dos pés antes do movimento
+        self.bottom_anterior = self.rect.bottom
         self.rect.x += self.speedx
-        self.rect.y += self.speedy
-        # Mantem dentro da tela
+
+        # Gravidade
+        self.speedy += 1
+        if self.speedy < 0:
+            # Sobe 9 pixels por atualização
+            self.rect.y -= 9
+        else:
+            # Mantém a queda com gravidade
+            self.rect.y += self.speedy
+
+        # Limites laterais
         if self.rect.right > WIDTH:
             self.rect.right = WIDTH
         if self.rect.left < 0:
             self.rect.left = 0
-        if self.rect.top < 0:
-            self.rect.top = 0
-        if self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT
+
+        # A colisão verificará se continua apoiado
+        self.no_chao = False
 
 # cria novas plataformas (matinhos)
 class matinho(pygame.sprite.Sprite):
@@ -60,12 +77,14 @@ class matinho(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(0, WIDTH - self.rect.width)
         self.rect.y = y
-        self.speedy = 5
+        self.top_anterior = self.rect.top
 
-    def update(self):
-        # Só desce enquanto o personagem está se movimentando
-        if player.speedx != 0 or player.speedy != 0:
-            self.rect.y += self.speedy
+    def update(self, personagem_movendo):
+        self.top_anterior = self.rect.top
+
+        # Só desce enquanto o personagem está no ar
+        if personagem_movendo:
+            self.rect.y += 4
 
 clock = pygame.time.Clock()
 
@@ -76,90 +95,130 @@ all_sprites = pygame.sprite.Group()
 plataformas = pygame.sprite.Group()
 
 # Criando o jogador
-player = Ship(ship_img)
+player = Ship(pascal_img)
 all_sprites.add(player)
 
-# Criando os matinhos: duas plataformas em cada altura
+# Criando os matinhos
 for i in range(10):
     y = HEIGHT - 140 - i * 140
-
     for coluna in range(2):
-        matinhos = matinho(matinho_img_small, y)
-
+        plataforma = matinho(matinho_img_small, y)
         inicio = coluna * (WIDTH // 2)
         fim = (coluna + 1) * (WIDTH // 2)
-
-        matinhos.rect.x = random.randint(inicio, fim - matinhos.rect.width)
-
-        plataformas.add(matinhos)
-        all_sprites.add(matinhos)
+        plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
+        plataformas.add(plataforma)
+        all_sprites.add(plataforma)
 
 while game:
     clock.tick(15)
     for event in pygame.event.get():
-        # se apertar o espaço o jogo fecha
         if event.type == pygame.QUIT:
             game = False
-        if event.type == pygame.KEYDOWN:
+        elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 game = False
-        # Verifica se apertou alguma tecla.
-        if event.type == pygame.KEYDOWN:
-            # Dependendo da tecla, altera a velocidade.
-            if event.key == pygame.K_LEFT:
-                player.speedx -= 100
-                player.speedy -= 100
-            if event.key == pygame.K_RIGHT:
-                player.speedx += 100
-                player.speedy -= 100
-        # Verifica se soltou alguma tecla.
-        if event.type == pygame.KEYUP:
-            # Dependendo da tecla, altera a velocidade.
-            if event.key == pygame.K_LEFT:
-                player.speedx += 100
-                player.speedy += 100
-            if event.key == pygame.K_RIGHT:
-                player.speedx -= 100
-                player.speedy += 100
+            elif event.key == pygame.K_LEFT:
+                # Pode mudar de direção mesmo no ar
+                player.speedx = -8
+                # Só inicia um novo pulo quando estiver apoiado
+                if player.no_chao:
+                    player.speedy = -18
+                    player.no_chao = False
+            elif event.key == pygame.K_RIGHT:
+                player.speedx = 8
+                if player.no_chao:
+                    player.speedy = -18
+                    player.no_chao = False
+            elif event.key == pygame.K_UP:
+                if player.no_chao:
+                    player.speedx = 0
+                    player.speedy = -18
+                    player.no_chao = False
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_LEFT and player.speedx < 0:
+                player.speedx = 0
+            elif event.key == pygame.K_RIGHT and player.speedx > 0:
+                player.speedx = 0
 
-    # atualiza as posicoes dos matinhos
-    all_sprites.update()
+    # Os matinhos descem enquanto o personagem está no ar
+    personagem_movendo = not player.no_chao
 
+    # Área visível do personagem dentro da imagem
+    area_player = player.image.get_bounding_rect()
+
+    # Posição dos pés antes do movimento
+    pes_antes = player.rect.y + area_player.bottom
+
+    # Guarda o topo visível de cada plataforma
+    topos_antes = {}
+
+    for plataforma in plataformas:
+        area = plataforma.image.get_bounding_rect()
+        topos_antes[plataforma] = plataforma.rect.y + area.centery
+
+    # Movimenta o personagem e as plataformas
+    player.update()
+    plataformas.update(personagem_movendo)
+
+    # Retângulo da parte visível do personagem na tela
+    corpo = area_player.move(player.rect.x, player.rect.y)
+    plataforma_pouso = None
+    primeiro_instante = float("inf")
+
+    for plataforma in plataformas:
+        area = plataforma.image.get_bounding_rect()
+        apoio = area.move(plataforma.rect.x, plataforma.rect.y)
+        sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
+        distancia_antes = topos_antes[plataforma] - pes_antes
+        distancia_depois = apoio.centery - corpo.bottom
+
+        # Verifica se os pés alcançaram a plataforma por cima
+        if sobrepoe_x and distancia_antes >= 0 and distancia_depois <= 0:
+            movimento = distancia_antes - distancia_depois
+            if movimento > 0:
+                instante = distancia_antes / movimento
+                if instante < primeiro_instante:
+                    primeiro_instante = instante
+                    plataforma_pouso = plataforma
+    if plataforma_pouso is not None:
+        area = plataforma_pouso.image.get_bounding_rect()
+        topo = plataforma_pouso.rect.y + area.centery
+        # Coloca os pés visíveis exatamente sobre o matinho
+        player.rect.y = topo - area_player.bottom
+        player.speedx = 0
+        player.speedy = 0
+        player.no_chao = True
+
+    # O fundo da tela funciona como chão
+    if player.rect.bottom >= HEIGHT:
+        player.rect.bottom = HEIGHT
+        player.speedy = 0
+        player.speedx = 0
+        player.no_chao = True
+
+    # Reaproveita os matinhos que saíram por baixo
     # Agrupa as plataformas que estão na mesma altura
     linhas = {}
-
     for plataforma in plataformas:
         y = plataforma.rect.y
         linhas.setdefault(y, []).append(plataforma)
-
     # Reposiciona cada dupla que saiu por baixo
     for y, linha in linhas.items():
         if y > HEIGHT:
             novo_y = min(plataforma.rect.y for plataforma in plataformas) - 140
-
             for coluna, plataforma in enumerate(linha):
                 inicio = coluna * (WIDTH // 2)
                 fim = (coluna + 1) * (WIDTH // 2)
-
                 plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
                 plataforma.rect.y = novo_y
+                plataforma.top_anterior = novo_y
 
-    # cor do fundo do jogo
-    window.fill((200, 162, 200))
-    window.fill((200, 162, 200))
+    # Desenha o fundo
+    window.blit(background, (0, 0))
 
-    # imagem de fundo
-    image = pygame.transform.scale(background, (500, 750))
-    window.blit(image, (0, 0))
-
-    # desenhando os matinhos
-    all_sprites.draw(window)
-
-    # posiciona o texto na tela do jogo
-    # window.blit(text, (200, 300))
-    # window.blit(text_, (150, 350))
-    # window.blit(background, (0, 0))
-    # window.blit(matinho_img_small, (matinho_x, matinho_y))
+    # Desenha os matinhos primeiro e o personagem por último
+    plataformas.draw(window)
+    window.blit(player.image, player.rect)
 
     pygame.display.update()
 
