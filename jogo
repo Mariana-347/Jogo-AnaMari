@@ -28,15 +28,23 @@ SOL_WIDTH = 45
 SOL_HEIGHT = 45
 
 # imagem de fundo
-background = pygame.image.load('torre_3.png').convert()
-
-# Fundo mais alto que a tela para permitir o movimento
-ALTURA_FUNDO = 2000
-background = pygame.transform.scale(background, (WIDTH, ALTURA_FUNDO))
-
-# Começa mostrando a parte de baixo da imagem
+background = pygame.image.load('Torre infinita entre floresta e cachoeira.png').convert()
+# Calcula a altura mantendo a proporção original
+largura, altura = background.get_size()
+ALTURA_FUNDO = round(altura * WIDTH / largura)
+background = pygame.transform.smoothscale(background, (WIDTH, ALTURA_FUNDO))
 fundo_y = HEIGHT - ALTURA_FUNDO
-velocidade_fundo = 1
+velocidade_fundo = 0.9
+
+# Área da porta no alto da torre, proporcional à imagem
+porta = pygame.Rect(round(WIDTH * 0.46), round(ALTURA_FUNDO * 0.055), round(WIDTH * 0.09), round(ALTURA_FUNDO * 0.03))
+
+# Guarda como o jogo terminou
+resultado = None
+
+# Fontes da tela final
+font_final = pygame.font.SysFont("Cambria", 50)
+font_mensagem = pygame.font.SysFont("Cambria", 28)
 
 # imagem do matinho (plataforma)
 matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
@@ -156,17 +164,11 @@ while game:
     # aumenta a taxa de atualização para 60 FPS
     clock.tick(60)
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            game = False
-        elif event.type == pygame.KEYDOWN:
-            # ESC encerra o jogo
+        if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 game = False
-            # Pulo com espaço ou seta para cima
             elif event.key == pygame.K_SPACE or event.key == pygame.K_UP:
                 pedido_pulo = True
-        elif event.type == pygame.KEYUP:
-            pass
 
     # movimentação horizontal contínua
     # Isso permite mudar de direção sem precisar apertar várias vezes.
@@ -238,9 +240,23 @@ while game:
         player.speedy = 0
         player.no_chao = True
 
-    # Encerra o jogo quando o personagem toca o chão
+    # Derrota quando o personagem toca o chão
     if player.rect.bottom >= HEIGHT:
+        resultado = "game_over"
         game = False
+        break
+
+    # Posição da porta na tela, acompanhando o fundo
+    porta_tela = porta.move(0, int(fundo_y))
+
+    # Atualiza o corpo após a correção da posição no pouso
+    corpo = area_player.move(player.rect.x, player.rect.y)
+
+    # Vitória quando o personagem encosta na porta
+    if corpo.colliderect(porta_tela):
+        resultado = "vitoria"
+        game = False
+        break
 
     if player.no_chao and pedido_pulo:
        #executa o pulo assim q o jogador tocar no mato
@@ -288,4 +304,44 @@ while game:
     texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
     window.blit(texto_pontos, (15, 15))
     pygame.display.update()
+
+# Tela final: aparece apenas em caso de vitória ou queda
+tela_final = resultado is not None
+
+while tela_final:
+    clock.tick(60)
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                tela_final = False
+
+    # Desenha o cenário atrás da mensagem
+    window.blit(background, (0, int(fundo_y)))
+
+    # Escurece o fundo para facilitar a leitura
+    sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    sombra.fill((0, 0, 0, 170))
+    window.blit(sombra, (0, 0))
+
+    if resultado == "vitoria":
+        titulo = "VITÓRIA!"
+        mensagem = "Pascal chegou à torre!"
+        cor = (255, 220, 100)
+    else:
+        titulo = "GAME OVER"
+        mensagem = "Pascal caiu no chão!"
+        cor = (255, 130, 130)
+
+    texto_titulo = font_final.render(titulo, True, cor)
+    texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
+    texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
+    texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
+
+    window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
+    window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
+    window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
+    window.blit(texto_sair,texto_sair.get_rect(center=(WIDTH // 2, 490)))
+
+    pygame.display.update()
+
 pygame.quit()
