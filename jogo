@@ -58,6 +58,7 @@ pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 sol_img = pygame.image.load('sol.png').convert_alpha()
 sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
 
+
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
         pygame.sprite.Sprite.__init__(self)
@@ -139,6 +140,7 @@ while tela_inicial and game:
                 tela_inicial = False
             elif event.key == pygame.K_ESCAPE:
                 game = False
+
     window.blit(background, (0, int(fundo_y)))
 
     # Escurece o cenário para destacar os textos
@@ -146,226 +148,243 @@ while tela_inicial and game:
     sombra.fill((0, 0, 0, 150))
     window.blit(sombra, (0, 0))
 
-    # tela inicial
     titulo_sky = font.render("SKY", True, (220, 180, 255))
     titulo_hopper = font.render("HOPPER", True, (220, 180, 255))
     texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
     texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
+
     window.blit(titulo_sky, titulo_sky.get_rect(center=(WIDTH // 2, 230)))
     window.blit(titulo_hopper, titulo_hopper.get_rect(center=(WIDTH // 2, 300)))
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
     pygame.display.update()
 
-# Criando um grupo de matinhos
-all_sprites = pygame.sprite.Group()
-plataformas = pygame.sprite.Group()
-# grupo dos sóis
-sois = pygame.sprite.Group()
-# Criando o jogador
-player = Ship(pascal_img)
-all_sprites.add(player)
-
-# Criando os matinhos
-for i in range(10):
-    y = HEIGHT - 140 - i * 140
-    for coluna in range(2):
-        plataforma = matinho(matinho_img_small, y)
-        inicio = coluna * (WIDTH // 2)
-        fim = (coluna + 1) * (WIDTH // 2)
-        plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
-        plataformas.add(plataforma)
-        all_sprites.add(plataforma)
-
-# criando o primeiro sol
-sol = Sol(sol_img)
-sois.add(sol)
-all_sprites.add(sol)
-
-#pedido do pulo
-pedido_pulo = False
-pontos=0
-
+# Cada repetição cria uma nova partida
 while game:
-    # aumenta a taxa de atualização para 60 FPS
-    clock.tick(60)
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                game = False
-            elif event.key == pygame.K_SPACE or event.key == pygame.K_UP:
-                pedido_pulo = True
+    resultado = None
+    fundo_y = HEIGHT - ALTURA_FUNDO
 
-    # movimentação horizontal contínua
-    # Isso permite mudar de direção sem precisar apertar várias vezes.
-    teclas = pygame.key.get_pressed()
-    if teclas[pygame.K_LEFT]:
-        player.speedx = -5
-    elif teclas[pygame.K_RIGHT]:
-        player.speedx = 5
-    else:
-        player.speedx = 0
+    # Criando um grupo de matinhos
+    all_sprites = pygame.sprite.Group()
+    plataformas = pygame.sprite.Group()
+    # grupo dos sóis
+    sois = pygame.sprite.Group()
+    # Criando o jogador
+    player = Ship(pascal_img)
+    all_sprites.add(player)
 
-    # Os matinhos descem enquanto o personagem está no ar
-    personagem_movendo = not player.no_chao
+    # Criando os matinhos
+    for i in range(10):
+        y = HEIGHT - 140 - i * 140
+        for coluna in range(2):
+            plataforma = matinho(matinho_img_small, y)
+            inicio = coluna * (WIDTH // 2)
+            fim = (coluna + 1) * (WIDTH // 2)
+            plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
+            plataformas.add(plataforma)
+            all_sprites.add(plataforma)
 
-    # Área visível do personagem dentro da imagem
-    area_player = player.image.get_bounding_rect()
+    # criando o primeiro sol
+    sol = Sol(sol_img)
+    sois.add(sol)
+    all_sprites.add(sol)
 
-    # Posição dos pés antes do movimento
-    pes_antes = player.rect.y + area_player.bottom
+    #pedido do pulo
+    pedido_pulo = False
+    pontos=0
 
-    # Guarda o topo visível de cada plataforma
-    topos_antes = {}
+    while game:
+        # aumenta a taxa de atualização para 60 FPS
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    game = False
+                elif event.key == pygame.K_SPACE or event.key == pygame.K_UP:
+                    pedido_pulo = True
+        if not game:
+            break
 
-    for plataforma in plataformas:
-        area = plataforma.image.get_bounding_rect()
-        topos_antes[plataforma] = (plataforma.rect.y + area.centery)
+        # movimentação horizontal contínua
+        teclas = pygame.key.get_pressed()
+        if teclas[pygame.K_LEFT]:
+            player.speedx = -5
+        elif teclas[pygame.K_RIGHT]:
+            player.speedx = 5
+        else:
+            player.speedx = 0
 
-    # Movimenta o personagem e as plataformas
-    player.update()
-    plataformas.update(personagem_movendo)
+        # Os matinhos descem enquanto o personagem está no ar
+        personagem_movendo = not player.no_chao
 
-    # movimenta os sóis
-    sois.update(personagem_movendo)
+        # Área visível do personagem dentro da imagem
+        area_player = player.image.get_bounding_rect()
 
-    # O fundo desce enquanto o personagem está no ar
-    if personagem_movendo:
-        fundo_y += velocidade_fundo
-        # Para ao mostrar o topo da imagem
-        if fundo_y > 0:
-            fundo_y = 0
+        # Posição dos pés antes do movimento
+        pes_antes = player.rect.y + area_player.bottom
 
-    # Retângulo da parte visível do personagem na tela
-    corpo = area_player.move(player.rect.x, player.rect.y)
-    plataforma_pouso = None
-    primeiro_instante = float("inf")
+        # Guarda o topo visível de cada plataforma
+        topos_antes = {}
 
-    for plataforma in plataformas:
-        area = plataforma.image.get_bounding_rect()
-        apoio = area.move(plataforma.rect.x, plataforma.rect.y)
-        sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
-        distancia_antes = (topos_antes[plataforma] - pes_antes)
-        distancia_depois = (apoio.centery - corpo.bottom)
+        for plataforma in plataformas:
+            area = plataforma.image.get_bounding_rect()
+            topos_antes[plataforma] = (plataforma.rect.y + area.centery)
 
-        # Verifica se os pés alcançaram a plataforma por cima
-        if (sobrepoe_x and distancia_antes >= 0 and distancia_depois <= 0 and player.speedy >= 0):
-            movimento = distancia_antes - distancia_depois
-            if movimento > 0:
-                instante = distancia_antes / movimento
-                if instante < primeiro_instante:
-                    primeiro_instante = instante
-                    plataforma_pouso = plataforma
+        # Movimenta o personagem e as plataformas
+        player.update()
 
-    if plataforma_pouso is not None:
-        area = plataforma_pouso.image.get_bounding_rect()
-        topo = plataforma_pouso.rect.y + area.centery
-        # Coloca os pés visíveis exatamente sobre o matinho
-        player.rect.y = topo - area_player.bottom
-        player.speedy = 0
-        player.no_chao = True
+        plataformas.update(personagem_movendo)
 
-    # Derrota quando o personagem toca o chão
-    if player.rect.bottom >= HEIGHT:
-        resultado = "game_over"
-        game = False
-        break
+        # movimenta os sóis
+        sois.update(personagem_movendo)
 
-    # Posição da porta na tela, acompanhando o fundo
-    porta_tela = porta.move(0, int(fundo_y))
+        # O fundo desce enquanto o personagem está no ar
+        if personagem_movendo:
+            fundo_y += velocidade_fundo
+            # Para ao mostrar o topo da imagem
+            if fundo_y > 0:
+                fundo_y = 0
 
-    # Atualiza o corpo após a correção da posição no pouso
-    corpo = area_player.move(player.rect.x, player.rect.y)
+        # Retângulo da parte visível do personagem na tela
+        corpo = area_player.move(player.rect.x, player.rect.y)
+        plataforma_pouso = None
+        primeiro_instante = float("inf")
 
-    # Vitória quando o personagem encosta na porta
-    if corpo.colliderect(porta_tela):
-        resultado = "vitoria"
-        game = False
-        break
+        for plataforma in plataformas:
+            area = plataforma.image.get_bounding_rect()
+            apoio = area.move(plataforma.rect.x, plataforma.rect.y)
+            sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
+            distancia_antes = (topos_antes[plataforma] - pes_antes)
+            distancia_depois = (apoio.centery - corpo.bottom)
 
-    if player.no_chao and pedido_pulo:
-       #executa o pulo assim q o jogador tocar no mato
-        player.speedy = -15
-        player.no_chao = False 
-        # reseta o pedido 
-        pedido_pulo = False 
+            # Verifica se os pés alcançaram a plataforma por cima
+            if (sobrepoe_x and distancia_antes >= 0 and distancia_depois <= 0 and player.speedy >= 0):
+                movimento = distancia_antes - distancia_depois
+                if movimento > 0:
+                    instante = distancia_antes / movimento
+                    if instante < primeiro_instante:
+                        primeiro_instante = instante
+                        plataforma_pouso = plataforma
 
-    # Reaproveita os matinhos que saíram por baixo
-    # Agrupa as plataformas que estão na mesma altura
-    linhas = {}
+        if plataforma_pouso is not None:
+            area = plataforma_pouso.image.get_bounding_rect()
+            topo = plataforma_pouso.rect.y + area.centery
+            # Coloca os pés visíveis exatamente sobre o matinho
+            player.rect.y = topo - area_player.bottom
+            player.speedy = 0
+            player.no_chao = True
 
-    for plataforma in plataformas:
-        y = plataforma.rect.y
-        linhas.setdefault(y, []).append(plataforma)
+        # Derrota quando o personagem toca o chão
+        if player.rect.bottom >= HEIGHT:
+            resultado = "game_over"
+            game = False
+            break
 
-    # Reposiciona cada dupla que saiu por baixo
-    for y, linha in linhas.items():
-        if y > HEIGHT:
-            novo_y = min( plataforma.rect.y for plataforma in plataformas) - 140
-            for coluna, plataforma in enumerate(linha):
-                inicio = coluna * (WIDTH // 2)
-                fim = (coluna + 1) * (WIDTH // 2)
-                plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
-                plataforma.rect.y = novo_y
-                plataforma.top_anterior = novo_y
+        # Posição da porta na tela, acompanhando o fundo
+        porta_tela = porta.move(0, int(fundo_y))
 
-    # verifica se o jogador coletou o sol
-    if pygame.sprite.spritecollide(player, sois, False):
-        pontos += 10
-        # O sol aparece em outro lugar depois de coletado
-        sol.novo_sol()
-    # Desenha o fundo
-    window.blit(background, (0, int(fundo_y)))
-    # Desenha os matinhos primeiro
-    plataformas.draw(window)
+        # Atualiza o corpo após a correção da posição no pouso
+        corpo = area_player.move(player.rect.x, player.rect.y)
 
-    # desenha os sóis
-    sois.draw(window)
+        # Vitória quando o personagem encosta na porta
+        if corpo.colliderect(porta_tela):
+            resultado = "vitoria"
+            game = False
+            break
 
-    # Desenha o personagem por último
-    window.blit(player.image, player.rect)
+        if player.no_chao and pedido_pulo:
+           #executa o pulo assim q o jogador tocar no mato
+            player.speedy = -15
+            player.no_chao = False 
+            # reseta o pedido 
+            pedido_pulo = False 
 
-    # mostra a pontuação na tela
-    texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
-    window.blit(texto_pontos, (15, 15))
-    pygame.display.update()
+        # Reaproveita os matinhos que saíram por baixo
+        # Agrupa as plataformas que estão na mesma altura
+        linhas = {}
 
-# Tela final: aparece apenas em caso de vitória ou queda
-tela_final = resultado is not None
+        for plataforma in plataformas:
+            y = plataforma.rect.y
+            linhas.setdefault(y, []).append(plataforma)
 
-while tela_final:
-    clock.tick(60)
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                tela_final = False
+        # Reposiciona cada dupla que saiu por baixo
+        for y, linha in linhas.items():
+            if y > HEIGHT:
+                novo_y = min( plataforma.rect.y for plataforma in plataformas) - 140
+                for coluna, plataforma in enumerate(linha):
+                    inicio = coluna * (WIDTH // 2)
+                    fim = (coluna + 1) * (WIDTH // 2)
+                    plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
+                    plataforma.rect.y = novo_y
+                    plataforma.top_anterior = novo_y
 
-    # Desenha o cenário atrás da mensagem
-    window.blit(background, (0, int(fundo_y)))
+        # verifica se o jogador coletou o sol
+        if pygame.sprite.spritecollide(player, sois, False):
+            pontos += 10
+            # O sol aparece em outro lugar depois de coletado
+            sol.novo_sol()
+        # Desenha o fundo
+        window.blit(background, (0, int(fundo_y)))
+        # Desenha os matinhos primeiro
+        plataformas.draw(window)
 
-    # Escurece o fundo para facilitar a leitura
-    sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    sombra.fill((0, 0, 0, 170))
-    window.blit(sombra, (0, 0))
+        # desenha os sóis
+        sois.draw(window)
 
-    if resultado == "vitoria":
-        titulo = "VITÓRIA!"
-        mensagem = "Pascal chegou à torre!"
-        cor = (255, 220, 100)
-    else:
-        titulo = "GAME OVER"
-        mensagem = "Pascal caiu no chão!"
-        cor = (255, 130, 130)
+        # Desenha o personagem por último
+        window.blit(player.image, player.rect)
 
-    texto_titulo = font_final.render(titulo, True, cor)
-    texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
-    texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
-    texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
-    window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
-    window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
-    window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
-    window.blit(texto_sair,texto_sair.get_rect(center=(WIDTH // 2, 490)))
+        # mostra a pontuação na tela
+        texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
+        window.blit(texto_pontos, (15, 15))
+        pygame.display.update()
 
-    pygame.display.update()
+    # Tela final: aparece apenas em caso de vitória ou queda
+    tela_final = resultado is not None
+
+    while tela_final:
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    tela_final = False
+                    game = False
+                elif event.key == pygame.K_RETURN:
+                    tela_final = False
+                    game = True
+
+        if not tela_final:
+            break
+
+        # Desenha o cenário atrás da mensagem
+        window.blit(background, (0, int(fundo_y)))
+
+        # Escurece o fundo para facilitar a leitura
+        sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        sombra.fill((0, 0, 0, 170))
+        window.blit(sombra, (0, 0))
+
+        if resultado == "vitoria":
+            titulo = "VITÓRIA!"
+            mensagem = "Pascal chegou à torre!"
+            cor = (255, 220, 100)
+        else:
+            titulo = "GAME OVER"
+            mensagem = "Pascal caiu no chão!"
+            cor = (255, 130, 130)
+
+        texto_titulo = font_final.render(titulo, True, cor)
+        texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
+        texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
+        texto_reiniciar = font_mensagem.render("ENTER para jogar novamente", True, (255, 255, 255))
+        texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
+
+        window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
+        window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
+        window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
+        window.blit(texto_reiniciar, texto_reiniciar.get_rect(center=(WIDTH // 2, 470)))
+        window.blit(texto_sair,texto_sair.get_rect(center=(WIDTH // 2, 520)))
+
+        pygame.display.update()
 
 pygame.quit()
