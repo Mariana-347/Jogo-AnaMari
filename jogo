@@ -58,7 +58,6 @@ pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 sol_img = pygame.image.load('sol.png').convert_alpha()
 sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
 
-
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
         pygame.sprite.Sprite.__init__(self)
@@ -125,10 +124,38 @@ class Sol(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.novo_sol()
 
-
 clock = pygame.time.Clock()
 
 game = True
+
+# Tela inicial: o jogo só começa depois de apertar ENTER
+tela_inicial = True
+
+while tela_inicial and game:
+    clock.tick(60)
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                tela_inicial = False
+            elif event.key == pygame.K_ESCAPE:
+                game = False
+    window.blit(background, (0, int(fundo_y)))
+
+    # Escurece o cenário para destacar os textos
+    sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    sombra.fill((0, 0, 0, 150))
+    window.blit(sombra, (0, 0))
+
+    # tela inicial
+    titulo_sky = font.render("SKY", True, (220, 180, 255))
+    titulo_hopper = font.render("HOPPER", True, (220, 180, 255))
+    texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
+    texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
+    window.blit(titulo_sky, titulo_sky.get_rect(center=(WIDTH // 2, 230)))
+    window.blit(titulo_hopper, titulo_hopper.get_rect(center=(WIDTH // 2, 300)))
+    window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
+    window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
+    pygame.display.update()
 
 # Criando um grupo de matinhos
 all_sprites = pygame.sprite.Group()
@@ -138,7 +165,6 @@ sois = pygame.sprite.Group()
 # Criando o jogador
 player = Ship(pascal_img)
 all_sprites.add(player)
-
 
 # Criando os matinhos
 for i in range(10):
@@ -198,7 +224,6 @@ while game:
 
     # Movimenta o personagem e as plataformas
     player.update()
-
     plataformas.update(personagem_movendo)
 
     # movimenta os sóis
@@ -336,7 +361,6 @@ while tela_final:
     texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
     texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
     texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
-
     window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
     window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
     window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
