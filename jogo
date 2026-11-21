@@ -58,6 +58,11 @@ pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 sol_img = pygame.image.load('sol.png').convert_alpha()
 sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
 
+# A distância cresce de 105 até 140 pixels, conforme a subida.
+def intervalo_plataformas(fundo_atual):
+    percurso = max(1, ALTURA_FUNDO - HEIGHT)
+    progresso = max(0, min(1, (fundo_atual - (HEIGHT - ALTURA_FUNDO)) / percurso))
+    return round(105 + 35 * progresso)
 
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
@@ -173,9 +178,10 @@ while game:
     player = Ship(pascal_img)
     all_sprites.add(player)
 
+
     # Criando os matinhos
     for i in range(10):
-        y = HEIGHT - 140 - i * 140
+        y = HEIGHT - 140 - i * intervalo_plataformas(fundo_y)
         for coluna in range(2):
             plataforma = matinho(matinho_img_small, y)
             inicio = coluna * (WIDTH // 2)
@@ -202,10 +208,12 @@ while game:
                     game = False
                 elif event.key == pygame.K_SPACE or event.key == pygame.K_UP:
                     pedido_pulo = True
+
         if not game:
             break
 
         # movimentação horizontal contínua
+        # Isso permite mudar de direção sem precisar apertar várias vezes.
         teclas = pygame.key.get_pressed()
         if teclas[pygame.K_LEFT]:
             player.speedx = -5
@@ -310,7 +318,7 @@ while game:
         # Reposiciona cada dupla que saiu por baixo
         for y, linha in linhas.items():
             if y > HEIGHT:
-                novo_y = min( plataforma.rect.y for plataforma in plataformas) - 140
+                novo_y = min(plataforma.rect.y for plataforma in plataformas) - intervalo_plataformas(fundo_y)
                 for coluna, plataforma in enumerate(linha):
                     inicio = coluna * (WIDTH // 2)
                     fim = (coluna + 1) * (WIDTH // 2)
