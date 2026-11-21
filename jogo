@@ -101,9 +101,52 @@ class matinho(pygame.sprite.Sprite):
         self.rect.x = random.randint(0, WIDTH - self.rect.width)
         self.rect.y = y
         self.top_anterior = self.rect.top
+        self.imagem_original = img
+        self.tipo = "normal"
+        self.ativa = True
+        self.tempo_sumir = None
+        self.direcao = 1
+        self.delta_x = 0
+        self.limite_esquerdo = 0
+        self.limite_direito = WIDTH - self.rect.width
+
+    def configurar(self, coluna, numero_linha):
+        # Uma plataforma móvel a cada quatro fileiras.
+        # Os lados se alternam: esquerda, direita, esquerda, direita...
+        linha_movel = numero_linha % 4 == 3
+        lado_movel = (numero_linha // 4) % 2
+        if linha_movel:
+            self.tipo = "movel" if coluna == lado_movel else "normal"
+        elif numero_linha > 0 and coluna == 1:
+            self.tipo = random.choice(["normal", "fragil"])
+        else:
+            self.tipo = "normal"
+        self.ativa = True
+        self.tempo_sumir = None
+        self.direcao = random.choice([-1, 1])
+        self.delta_x = 0
+        self.limite_esquerdo = coluna * (WIDTH // 2)
+        self.limite_direito = (coluna + 1) * (WIDTH // 2) - self.rect.width
+        self.image = self.imagem_original.copy()
+        if self.tipo == "movel":
+            self.image.fill((150, 200, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
+        elif self.tipo == "fragil":
+            self.image.fill((255, 180, 140, 255), special_flags=pygame.BLEND_RGBA_MULT)
 
     def update(self, personagem_movendo):
         self.top_anterior = self.rect.top
+        x_anterior = self.rect.x
+        if self.tipo == "movel" and self.ativa:
+            self.rect.x += self.direcao * 2
+            if self.rect.x <= self.limite_esquerdo or self.rect.x >= self.limite_direito:
+                self.rect.x = max(self.limite_esquerdo, min(self.limite_direito, self.rect.x))
+                self.direcao *= -1
+        self.delta_x = self.rect.x - x_anterior
+        if self.tempo_sumir is not None:
+            self.tempo_sumir -= 1
+            if self.tempo_sumir <= 0:
+                self.ativa = False
+                self.image = pygame.Surface(self.imagem_original.get_size(), pygame.SRCALPHA)
         # Só desce enquanto o personagem está no ar
         if personagem_movendo:
             self.rect.y += 3
@@ -178,7 +221,6 @@ while game:
     player = Ship(pascal_img)
     all_sprites.add(player)
 
-
     # Criando os matinhos
     for i in range(10):
         y = HEIGHT - 140 - i * intervalo_plataformas(fundo_y)
@@ -187,8 +229,13 @@ while game:
             inicio = coluna * (WIDTH // 2)
             fim = (coluna + 1) * (WIDTH // 2)
             plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
+            # O número da fileira define a frequência e o lado da móvel.
+            plataforma.configurar(coluna, i)
             plataformas.add(plataforma)
             all_sprites.add(plataforma)
+
+    # Mantém a sequência de lados ao criar novas fileiras.
+    proxima_linha = 10
 
     # criando o primeiro sol
     sol = Sol(sol_img)
@@ -259,6 +306,8 @@ while game:
         primeiro_instante = float("inf")
 
         for plataforma in plataformas:
+            if not plataforma.ativa:
+                continue
             area = plataforma.image.get_bounding_rect()
             apoio = area.move(plataforma.rect.x, plataforma.rect.y)
             sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
@@ -281,6 +330,9 @@ while game:
             player.rect.y = topo - area_player.bottom
             player.speedy = 0
             player.no_chao = True
+            player.rect.x += plataforma_pouso.delta_x
+            if plataforma_pouso.tipo == "fragil" and plataforma_pouso.tempo_sumir is None:
+                plataforma_pouso.tempo_sumir = 30  # some meio segundo após o pouso
 
         # Derrota quando o personagem toca o chão
         if player.rect.bottom >= HEIGHT:
@@ -325,6 +377,8 @@ while game:
                     plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
                     plataforma.rect.y = novo_y
                     plataforma.top_anterior = novo_y
+                    plataforma.configurar(coluna, proxima_linha)
+                proxima_linha += 1
 
         # verifica se o jogador coletou o sol
         if pygame.sprite.spritecollide(player, sois, False):
