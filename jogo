@@ -1,7 +1,28 @@
+
 import pygame
 import random
+import math
+from array import array
 
+pygame.mixer.pre_init(22050, -16, 1, 512, allowedchanges=0)
 pygame.init()
+
+# Efeitos simples; o jogo também funciona se o computador não tiver áudio.
+def criar_som(frequencia, duracao):
+    if pygame.mixer.get_init() is None:
+        return None
+    taxa = pygame.mixer.get_init()[0]
+    total = int(taxa * duracao)
+    amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
+    return pygame.mixer.Sound(buffer=amostras)
+
+
+sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
+
+
+def tocar_som(nome):
+    if sons[nome] is not None:
+        sons[nome].play()
 
 # define o tamanho da tela do jogo
 WIDTH = 500
@@ -57,6 +78,7 @@ pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 # imagem do solzinho (pontuação)
 sol_img = pygame.image.load('sol.png').convert_alpha()
 sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
+
 
 # A distância cresce de 105 até 140 pixels, conforme a subida.
 def intervalo_plataformas(fundo_atual):
@@ -260,7 +282,6 @@ while game:
             break
 
         # movimentação horizontal contínua
-        # Isso permite mudar de direção sem precisar apertar várias vezes.
         teclas = pygame.key.get_pressed()
         if teclas[pygame.K_LEFT]:
             player.speedx = -5
@@ -337,6 +358,7 @@ while game:
         # Derrota quando o personagem toca o chão
         if player.rect.bottom >= HEIGHT:
             resultado = "game_over"
+            tocar_som("game_over")
             game = False
             break
 
@@ -349,12 +371,14 @@ while game:
         # Vitória quando o personagem encosta na porta
         if corpo.colliderect(porta_tela):
             resultado = "vitoria"
+            tocar_som("vitoria")
             game = False
             break
 
         if player.no_chao and pedido_pulo:
            #executa o pulo assim q o jogador tocar no mato
             player.speedy = -15
+            tocar_som("pulo")
             player.no_chao = False 
             # reseta o pedido 
             pedido_pulo = False 
@@ -383,6 +407,7 @@ while game:
         # verifica se o jogador coletou o sol
         if pygame.sprite.spritecollide(player, sois, False):
             pontos += 10
+            tocar_som("sol")
             # O sol aparece em outro lugar depois de coletado
             sol.novo_sol()
         # Desenha o fundo
