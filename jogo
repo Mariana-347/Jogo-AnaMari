@@ -1,4 +1,3 @@
-
 import pygame
 import random
 import math
@@ -16,13 +15,12 @@ def criar_som(frequencia, duracao):
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
     return pygame.mixer.Sound(buffer=amostras)
 
-
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
-
 
 def tocar_som(nome):
     if sons[nome] is not None:
         sons[nome].play()
+
 
 # define o tamanho da tela do jogo
 WIDTH = 500
@@ -79,7 +77,6 @@ pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
 sol_img = pygame.image.load('sol.png').convert_alpha()
 sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
 
-
 # A distância cresce de 105 até 140 pixels, conforme a subida.
 def intervalo_plataformas(fundo_atual):
     percurso = max(1, ALTURA_FUNDO - HEIGHT)
@@ -97,8 +94,25 @@ class Ship(pygame.sprite.Sprite):
         self.speedy = -15
         self.no_chao = True
         self.bottom_anterior = self.rect.bottom
+        self.olhando_esquerda = False
+        self.quadro_animacao = 0
+
+    def desenhar(self, tela):
+        imagem = pygame.transform.flip(self.image, self.olhando_esquerda, False)
+        if not self.no_chao:
+            tamanho = (PASCAL_WIDTH - 6, PASCAL_HEIGHT + 6)
+        elif self.speedx:
+            oscilacao = 3 if (self.quadro_animacao // 6) % 2 else -3
+            tamanho = (PASCAL_WIDTH + oscilacao, PASCAL_HEIGHT - oscilacao)
+        else:
+            tamanho = (PASCAL_WIDTH, PASCAL_HEIGHT)
+        imagem = pygame.transform.smoothscale(imagem, tamanho)
+        tela.blit(imagem, imagem.get_rect(midbottom=self.rect.midbottom))
 
     def update(self):
+        self.quadro_animacao += 1
+        if self.speedx:
+            self.olhando_esquerda = self.speedx < 0
         # Guarda a posição dos pés antes do movimento
         self.bottom_anterior = self.rect.bottom
         self.rect.x += self.speedx
@@ -419,7 +433,7 @@ while game:
         sois.draw(window)
 
         # Desenha o personagem por último
-        window.blit(player.image, player.rect)
+        player.desenhar(window)
 
         # mostra a pontuação na tela
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
