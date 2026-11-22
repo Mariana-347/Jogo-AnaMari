@@ -23,6 +23,7 @@ def tocar_som(nome):
     if sons[nome] is not None:
         sons[nome].play()
 
+
 # define o tamanho da tela do jogo
 WIDTH = 500
 HEIGHT = 750
@@ -210,6 +211,34 @@ class Sol(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.novo_sol()
 
+class ItemEspecial(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((36, 36), pygame.SRCALPHA)
+        self.rect = self.image.get_rect()
+        self.novo_item()
+
+    def novo_item(self):
+        self.tipo = random.choice(["escudo", "pulo"])
+        self.image.fill((0, 0, 0, 0))
+        if self.tipo == "escudo":
+            pygame.draw.polygon(self.image, (90, 210, 255), [(18, 1), (33, 7), (30, 24), (18, 35), (6, 24), (3, 7)])
+        else:
+            pontas = []
+            for i in range(10):
+                angulo = -math.pi / 2 + i * math.pi / 5
+                raio = 17 if i % 2 == 0 else 8
+                pontas.append((18 + math.cos(angulo) * raio, 18 + math.sin(angulo) * raio))
+            pygame.draw.polygon(self.image, (255, 220, 80), pontas)
+        self.rect.x = random.randint(30, WIDTH - 66)
+        self.rect.y = -random.randint(250, 500)
+
+    def update(self, personagem_movendo):
+        if personagem_movendo:
+            self.rect.y += 3
+        if self.rect.top > HEIGHT:
+            self.novo_item()
+
 ARQUIVO_RECORDE = Path(__file__).resolve().with_name("recorde_pascal.json")
 try:
     dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
@@ -298,6 +327,9 @@ while game:
     #pedido do pulo
     pedido_pulo = False
     pontos=0
+    itens = pygame.sprite.GroupSingle(ItemEspecial())
+    escudo = False
+    tempo_superpulo = 0
     distancia_inicial_porta = max(1, player.rect.centery - (porta.centery + fundo_y))
     progresso_maximo = 0
 
@@ -347,6 +379,17 @@ while game:
 
         # movimenta os sóis
         sois.update(personagem_movendo)
+        itens.update(personagem_movendo)
+        if tempo_superpulo > 0:
+            tempo_superpulo -= 1
+        if pygame.sprite.spritecollide(player, itens, False):
+            item = itens.sprite
+            if item.tipo == "escudo":
+                escudo = True
+            else:
+                tempo_superpulo = 8 * 60
+            tocar_som("sol")
+            item.novo_item()
 
         # O fundo desce enquanto o personagem está no ar
         if personagem_movendo:
@@ -391,10 +434,18 @@ while game:
 
         # Derrota quando o personagem toca o chão
         if player.rect.bottom >= HEIGHT:
-            resultado = "game_over"
-            tocar_som("game_over")
-            game = False
-            break
+            if escudo:
+                escudo = False
+                player.rect.bottom = HEIGHT - 10
+                player.speedy = -18
+                player.no_chao = False
+                pedido_pulo = False
+                tocar_som("pulo")
+            else:
+                resultado = "game_over"
+                tocar_som("game_over")
+                game = False
+                break
 
         # Posição da porta na tela, acompanhando o fundo
         porta_tela = porta.move(0, int(fundo_y))
@@ -411,7 +462,7 @@ while game:
 
         if player.no_chao and pedido_pulo:
            #executa o pulo assim q o jogador tocar no mato
-            player.speedy = -15
+            player.speedy = -19 if tempo_superpulo > 0 else -15
             tocar_som("pulo")
             player.no_chao = False 
             # reseta o pedido 
@@ -451,9 +502,20 @@ while game:
 
         # desenha os sóis
         sois.draw(window)
+        itens.draw(window)
 
         # Desenha o personagem por último
         player.desenhar(window)
+        if escudo:
+            pygame.draw.circle(window, (90, 210, 255), player.rect.center, 53, 3)
+        efeitos = []
+        if escudo:
+            efeitos.append("Escudo ativo")
+        if tempo_superpulo > 0:
+            efeitos.append(f"Superpulo: {math.ceil(tempo_superpulo / 60)}s")
+        if efeitos:
+            texto_efeitos = font_mensagem.render(" | ".join(efeitos), True, (255, 230, 110))
+            window.blit(texto_efeitos, (15, 90))
 
         # mostra a pontuação na tela
         distancia_porta = max(0, player.rect.centery - (porta.centery + fundo_y))
