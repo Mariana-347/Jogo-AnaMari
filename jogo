@@ -17,12 +17,12 @@ def criar_som(frequencia, duracao):
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
     return pygame.mixer.Sound(buffer=amostras)
 
+
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
 
 def tocar_som(nome):
     if sons[nome] is not None:
         sons[nome].play()
-
 
 # define o tamanho da tela do jogo
 WIDTH = 500
@@ -84,6 +84,63 @@ def intervalo_plataformas(fundo_atual):
     percurso = max(1, ALTURA_FUNDO - HEIGHT)
     progresso = max(0, min(1, (fundo_atual - (HEIGHT - ALTURA_FUNDO)) / percurso))
     return round(105 + 35 * progresso)
+
+# Animação de chegada: aproxima, diminui e faz Pascal desaparecer na porta
+def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, itens, pontos):
+    duracao = 1200  # milissegundos
+    decorrido = 0
+    personagem.speedx = 0
+    personagem.speedy = 0
+
+    imagem = pygame.transform.flip(personagem.image, personagem.olhando_esquerda, False)
+    area_visivel = imagem.get_bounding_rect()
+    if area_visivel.width == 0 or area_visivel.height == 0:
+        area_visivel = imagem.get_rect()
+    imagem = imagem.subsurface(area_visivel).copy()
+    inicio = area_visivel.move(personagem.rect.topleft).center
+    destino = porta_destino.center
+    escala_final = max(0.05, min(1, porta_destino.width * 0.75 / imagem.get_width(),
+                                      porta_destino.height * 0.85 / imagem.get_height()))
+
+    # Guarda o cenário sem o personagem. Tudo fica parado durante a entrada.
+    cena = pygame.Surface((WIDTH, HEIGHT))
+    cena.blit(background, (0, int(fundo_atual)))
+    plataformas.draw(cena)
+    sois.draw(cena)
+    itens.draw(cena)
+    texto_pontos = font_pontos.render(f"Pontos: {pontos}", True, (128, 0, 128))
+    texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
+    texto_progresso = font_mensagem.render("Torre: 100%", True, (255, 255, 255))
+    cena.blit(texto_pontos, (15, 15))
+    cena.blit(texto_recorde, (15, 55))
+    pygame.draw.rect(cena, (190, 135, 245), (WIDTH - 170, 20, 150, 16), border_radius=8)
+    cena.blit(texto_progresso, (WIDTH - 170, 44))
+
+    while True:
+        # Continua lendo os eventos, sem usar esperas que travem a janela.
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return False
+
+        progresso_animacao = min(1, decorrido / duracao)
+        suave = progresso_animacao * progresso_animacao * (3 - 2 * progresso_animacao)
+        escala = 1 + (escala_final - 1) * suave
+        tamanho = (max(1, round(imagem.get_width() * escala)),
+                   max(1, round(imagem.get_height() * escala)))
+        quadro = pygame.transform.smoothscale(imagem, tamanho)
+        # Desaparece aos poucos na segunda metade da entrada.
+        opacidade = round(255 * (1 - max(0, (progresso_animacao - 0.55) / 0.45)))
+        quadro.set_alpha(max(0, min(255, opacidade)))
+        centro = (round(inicio[0] + (destino[0] - inicio[0]) * suave),
+                  round(inicio[1] + (destino[1] - inicio[1]) * suave))
+        posicao = quadro.get_rect(center=centro)
+
+        window.blit(cena, (0, 0))
+        window.blit(quadro, posicao)
+        pygame.display.update()
+        if progresso_animacao >= 1:
+            return True
+        decorrido += clock.tick(60)
 
 class Ship(pygame.sprite.Sprite):
     def __init__(self, img):
@@ -287,7 +344,7 @@ while tela_inicial and game:
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
     font_ajuda = pygame.font.SysFont("Cambria", 21)
-    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Colete sóis e alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo"]
+    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Colete sóis e alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo",]
     for linha, instrucao in enumerate(instrucoes):
         texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
         window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
@@ -457,10 +514,11 @@ while game:
         # Atualiza o corpo após a correção da posição no pouso
         corpo = area_player.move(player.rect.x, player.rect.y)
 
-        # Vitória quando o personagem encosta na porta
+        # Primeiro mostra Pascal entrando; depois abre a tela de vitória.
         if corpo.colliderect(porta_tela):
-            resultado = "vitoria"
             tocar_som("vitoria")
+            entrou = animar_entrada(player, porta_tela, fundo_y, plataformas, sois, itens, pontos)
+            resultado = "vitoria" if entrou else None
             game = False
             break
 
