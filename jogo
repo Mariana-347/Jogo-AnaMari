@@ -286,6 +286,11 @@ while tela_inicial and game:
     window.blit(titulo_hopper, titulo_hopper.get_rect(center=(WIDTH // 2, 300)))
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
+    font_ajuda = pygame.font.SysFont("Cambria", 21)
+    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Colete sóis e alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo"]
+    for linha, instrucao in enumerate(instrucoes):
+        texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
+        window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
     pygame.display.update()
 
 # Cada repetição cria uma nova partida
@@ -301,7 +306,6 @@ while game:
     # Criando o jogador
     player = Ship(pascal_img)
     all_sprites.add(player)
-
 
     # Criando os matinhos
     for i in range(10):
