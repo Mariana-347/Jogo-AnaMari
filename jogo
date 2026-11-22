@@ -49,7 +49,7 @@ SOL_WIDTH = 45
 SOL_HEIGHT = 45
 
 # imagem de fundo
-background = pygame.image.load('Torre infinita entre floresta e cachoeira.png').convert()
+background = pygame.image.load('Torre dourada entre florestas e cachoeiras.png').convert()
 # Calcula a altura mantendo a proporção original
 largura, altura = background.get_size()
 ALTURA_FUNDO = round(altura * WIDTH / largura)
