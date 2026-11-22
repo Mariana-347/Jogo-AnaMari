@@ -2,6 +2,8 @@ import pygame
 import random
 import math
 from array import array
+from pathlib import Path
+import json
 
 pygame.mixer.pre_init(22050, -16, 1, 512, allowedchanges=0)
 pygame.init()
@@ -15,7 +17,9 @@ def criar_som(frequencia, duracao):
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
     return pygame.mixer.Sound(buffer=amostras)
 
+
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
+
 
 def tocar_som(nome):
     if sons[nome] is not None:
@@ -209,6 +213,21 @@ class Sol(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.novo_sol()
 
+ARQUIVO_RECORDE = Path(__file__).resolve().with_name("recorde_pascal.json")
+try:
+    dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
+    recorde = max(0, int(dados_recorde["recorde"]))
+except (OSError, ValueError, TypeError, KeyError):
+    recorde = 0
+erro_recorde = False
+
+def salvar_recorde(valor):
+    try:
+        ARQUIVO_RECORDE.write_text(json.dumps({"recorde": valor}), encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
 clock = pygame.time.Clock()
 
 game = True
@@ -247,7 +266,6 @@ while tela_inicial and game:
 while game:
     resultado = None
     fundo_y = HEIGHT - ALTURA_FUNDO
-
     # Criando um grupo de matinhos
     all_sprites = pygame.sprite.Group()
     plataformas = pygame.sprite.Group()
@@ -296,6 +314,7 @@ while game:
             break
 
         # movimentação horizontal contínua
+        # Isso permite mudar de direção sem precisar apertar várias vezes.
         teclas = pygame.key.get_pressed()
         if teclas[pygame.K_LEFT]:
             player.speedx = -5
@@ -438,7 +457,13 @@ while game:
         # mostra a pontuação na tela
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
         window.blit(texto_pontos, (15, 15))
+        texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
+        window.blit(texto_recorde, (15, 55))
         pygame.display.update()
+
+    if resultado is not None and pontos > recorde:
+        recorde = pontos
+        erro_recorde = not salvar_recorde(recorde)
 
     # Tela final: aparece apenas em caso de vitória ou queda
     tela_final = resultado is not None
@@ -483,7 +508,10 @@ while game:
         window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
         window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
         window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
-        window.blit(texto_reiniciar, texto_reiniciar.get_rect(center=(WIDTH // 2, 470)))
+        aviso_recorde = " (não salvo)" if erro_recorde else ""
+        texto_recorde = font_mensagem.render(f"Recorde: {recorde}{aviso_recorde}", True, (255, 220, 100))
+        window.blit(texto_recorde, texto_recorde.get_rect(center=(WIDTH // 2, 440)))
+        window.blit(texto_reiniciar, texto_reiniciar.get_rect(center=(WIDTH // 2, 490)))
         window.blit(texto_sair,texto_sair.get_rect(center=(WIDTH // 2, 520)))
 
         pygame.display.update()
