@@ -17,14 +17,11 @@ def criar_som(frequencia, duracao):
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
     return pygame.mixer.Sound(buffer=amostras)
 
-
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
-
 
 def tocar_som(nome):
     if sons[nome] is not None:
         sons[nome].play()
-
 
 # define o tamanho da tela do jogo
 WIDTH = 500
@@ -266,6 +263,7 @@ while tela_inicial and game:
 while game:
     resultado = None
     fundo_y = HEIGHT - ALTURA_FUNDO
+
     # Criando um grupo de matinhos
     all_sprites = pygame.sprite.Group()
     plataformas = pygame.sprite.Group()
@@ -274,6 +272,7 @@ while game:
     # Criando o jogador
     player = Ship(pascal_img)
     all_sprites.add(player)
+
 
     # Criando os matinhos
     for i in range(10):
@@ -299,6 +298,8 @@ while game:
     #pedido do pulo
     pedido_pulo = False
     pontos=0
+    distancia_inicial_porta = max(1, player.rect.centery - (porta.centery + fundo_y))
+    progresso_maximo = 0
 
     while game:
         # aumenta a taxa de atualização para 60 FPS
@@ -455,6 +456,17 @@ while game:
         player.desenhar(window)
 
         # mostra a pontuação na tela
+        distancia_porta = max(0, player.rect.centery - (porta.centery + fundo_y))
+        progresso = max(0, min(0.99, 1 - distancia_porta / distancia_inicial_porta))
+        progresso_maximo = max(progresso_maximo, progresso)
+        barra = pygame.Rect(WIDTH - 170, 20, 150, 16)
+        pygame.draw.rect(window, (35, 25, 50), barra, border_radius=8)
+        preenchimento = barra.copy()
+        preenchimento.width = round(barra.width * progresso_maximo)
+        if preenchimento.width > 0:
+            pygame.draw.rect(window, (190, 135, 245), preenchimento, border_radius=8)
+        texto_progresso = font_mensagem.render(f"Torre: {int(progresso_maximo * 100)}%", True, (255, 255, 255))
+        window.blit(texto_progresso, (WIDTH - 170, 44))
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
         window.blit(texto_pontos, (15, 15))
         texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
@@ -492,7 +504,7 @@ while game:
 
         if resultado == "vitoria":
             titulo = "VITÓRIA!"
-            mensagem = "Pascal chegou à torre!"
+            mensagem = "Pascal chegou à torre! 100%"
             cor = (255, 220, 100)
         else:
             titulo = "GAME OVER"
