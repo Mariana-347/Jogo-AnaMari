@@ -17,7 +17,6 @@ def criar_som(frequencia, duracao):
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
     return pygame.mixer.Sound(buffer=amostras)
 
-
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
 
 def tocar_som(nome):
@@ -34,8 +33,8 @@ pygame.display.set_caption('Jogo da MariAna')
 
 # textos
 font = pygame.font.SysFont("Cambria", 60)
-text = font.render('SKY', True, (128, 0, 128))
-text_ = font.render('HOPPER', True, (128, 0, 128))
+text = font.render('PASCAL', True, (128, 0, 128))
+text_ = font.render('NAS ALTURAS', True, (128, 0, 128))
 
 # mostra a pontuação
 font_pontos = pygame.font.SysFont("Cambria", 35)
@@ -334,13 +333,13 @@ while tela_inicial and game:
     sombra.fill((0, 0, 0, 150))
     window.blit(sombra, (0, 0))
 
-    titulo_sky = font.render("SKY", True, (220, 180, 255))
-    titulo_hopper = font.render("HOPPER", True, (220, 180, 255))
+    titulo_pascal = font.render("PASCAL", True, (220, 180, 255))
+    titulo_nasalturas = font.render("NAS ALTURAS", True, (220, 180, 255))
     texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
     texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
 
-    window.blit(titulo_sky, titulo_sky.get_rect(center=(WIDTH // 2, 230)))
-    window.blit(titulo_hopper, titulo_hopper.get_rect(center=(WIDTH // 2, 300)))
+    window.blit(titulo_pascal, titulo_pascal.get_rect(center=(WIDTH // 2, 230)))
+    window.blit(titulo_nasalturas, titulo_nasalturas.get_rect(center=(WIDTH // 2, 300)))
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
     font_ajuda = pygame.font.SysFont("Cambria", 21)
