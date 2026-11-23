@@ -29,7 +29,7 @@ HEIGHT = 750
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
 # nome do jogo
-pygame.display.set_caption('Jogo da MariAna')
+pygame.display.set_caption('Pascal nas Alturas')
 
 # textos
 font = pygame.font.SysFont("Cambria", 60)
@@ -47,17 +47,67 @@ PASCAL_HEIGHT = 100
 SOL_WIDTH = 45
 SOL_HEIGHT = 45
 
-# imagem de fundo
-background = pygame.image.load('Torre dourada entre florestas e cachoeiras.png').convert()
-# Calcula a altura mantendo a proporção original
-largura, altura = background.get_size()
-ALTURA_FUNDO = round(altura * WIDTH / largura)
-background = pygame.transform.smoothscale(background, (WIDTH, ALTURA_FUNDO))
+# IMAGENS DE CADA FASE
+FASES = [
+    {  # FASE 1
+        'fundo': 'Torre dourada entre florestas e cachoeiras.png',
+        'plataforma': 'matinho p jogo.png',
+        'personagem': 'pascal.png',
+        'sol': 'sol.png',
+        # Porta: posição x, posição y, largura e altura como frações do fundo.
+        'porta': (0.46, 0.055, 0.09, 0.03),
+    },
+    {  # FASE 2 — TROQUE AS IMAGENS AQUI
+        'fundo': 'Castelo sob lanternas no céu noturno.png',
+        'plataforma': 'luz flutuante.png',
+        'personagem': 'pascal.png',
+        'sol': 'sol.png',
+        'porta': (0.46, 0.055, 0.09, 0.03),
+    },
+]
+
+PASTA_JOGO = Path(__file__).resolve().parent
+fase_atual = 0
+pontos_acumulados = 0
+
+
+def carregar_imagem(nome, transparente=False):
+    """Abre uma imagem da pasta do jogo."""
+    caminho = PASTA_JOGO / nome
+    # Aceita também o nome com (1) usado no arquivo de fundo enviado.
+    if not caminho.exists() and nome == 'Torre dourada entre florestas e cachoeiras.png':
+        caminho = PASTA_JOGO / 'Torre dourada entre florestas e cachoeiras(1).png'
+    imagem = pygame.image.load(str(caminho))
+    if transparente:
+        return imagem.convert_alpha()
+    return imagem.convert()
+
+
+def carregar_fase(numero):
+    """Carrega as imagens e a porta da fase, mantendo as mesmas mecânicas."""
+    imagens = FASES[numero]
+    fundo = carregar_imagem(imagens['fundo'])
+    largura, altura = fundo.get_size()
+    altura_fundo = round(altura * WIDTH / largura)
+    fundo = pygame.transform.smoothscale(fundo, (WIDTH, altura_fundo))
+
+    plataforma = carregar_imagem(imagens['plataforma'], True)
+    plataforma = pygame.transform.scale(plataforma, (MATINHO_WIDTH, MATINHO_HEIGHT))
+    personagem = carregar_imagem(imagens['personagem'], True)
+    personagem = pygame.transform.scale(personagem, (PASCAL_WIDTH, PASCAL_HEIGHT))
+    sol = carregar_imagem(imagens['sol'], True)
+    sol = pygame.transform.scale(sol, (SOL_WIDTH, SOL_HEIGHT))
+
+    x, y, largura_porta, altura_porta = imagens['porta']
+    porta_fase = pygame.Rect(round(WIDTH * x), round(altura_fundo * y),
+                            round(WIDTH * largura_porta), round(altura_fundo * altura_porta))
+    return fundo, altura_fundo, porta_fase, plataforma, personagem, sol
+
+
+# Carrega a primeira fase para mostrar o cenário na tela inicial.
+background, ALTURA_FUNDO, porta, matinho_img_small, pascal_img, sol_img = carregar_fase(fase_atual)
 fundo_y = HEIGHT - ALTURA_FUNDO
 velocidade_fundo = 0.9
-
-# Área da porta no alto da torre, proporcional à imagem
-porta = pygame.Rect(round(WIDTH * 0.46), round(ALTURA_FUNDO * 0.055), round(WIDTH * 0.09), round(ALTURA_FUNDO * 0.03))
 
 # Guarda como o jogo terminou
 resultado = None
@@ -65,18 +115,6 @@ resultado = None
 # Fontes da tela final
 font_final = pygame.font.SysFont("Cambria", 50)
 font_mensagem = pygame.font.SysFont("Cambria", 28)
-
-# imagem do matinho (plataforma)
-matinho_img = pygame.image.load('matinho p jogo.png').convert_alpha()
-matinho_img_small = pygame.transform.scale( matinho_img, (MATINHO_WIDTH, MATINHO_HEIGHT))
-
-# imagem do pascal (personagem)
-pascal_img = pygame.image.load('pascal.png').convert_alpha()
-pascal_img = pygame.transform.scale(pascal_img, (PASCAL_WIDTH, PASCAL_HEIGHT))
-
-# imagem do solzinho (pontuação)
-sol_img = pygame.image.load('sol.png').convert_alpha()
-sol_img = pygame.transform.scale(sol_img, (SOL_WIDTH, SOL_HEIGHT))
 
 # A distância cresce de 105 até 140 pixels, conforme a subida.
 def intervalo_plataformas(fundo_atual):
@@ -113,7 +151,7 @@ def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, it
     cena.blit(texto_pontos, (15, 15))
     cena.blit(texto_recorde, (15, 55))
     pygame.draw.rect(cena, (190, 135, 245), (WIDTH - 170, 20, 150, 16), border_radius=8)
-    cena.blit(texto_progresso, (WIDTH - 170, 44))
+    cena.blit(texto_progresso, texto_progresso.get_rect(topright=(WIDTH - 15, 44)))
 
     while True:
         # Continua lendo os eventos, sem usar esperas que travem a janela.
@@ -343,7 +381,7 @@ while tela_inicial and game:
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
     font_ajuda = pygame.font.SysFont("Cambria", 21)
-    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Colete sóis e alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo",]
+    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Complete as duas fases e colete sóis", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo",]
     for linha, instrucao in enumerate(instrucoes):
         texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
         window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
@@ -351,6 +389,8 @@ while tela_inicial and game:
 
 # Cada repetição cria uma nova partida
 while game:
+    # Recria cenário, personagem, plataformas e itens para a fase escolhida.
+    background, ALTURA_FUNDO, porta, matinho_img_small, pascal_img, sol_img = carregar_fase(fase_atual)
     resultado = None
     fundo_y = HEIGHT - ALTURA_FUNDO
 
@@ -386,7 +426,7 @@ while game:
 
     #pedido do pulo
     pedido_pulo = False
-    pontos=0
+    pontos = pontos_acumulados  # Os pontos da fase 1 continuam na fase 2.
     itens = pygame.sprite.GroupSingle(ItemEspecial())
     escudo = False
     tempo_superpulo = 0
@@ -517,7 +557,12 @@ while game:
         if corpo.colliderect(porta_tela):
             tocar_som("vitoria")
             entrou = animar_entrada(player, porta_tela, fundo_y, plataformas, sois, itens, pontos)
-            resultado = "vitoria" if entrou else None
+            if not entrou:
+                resultado = None
+            elif fase_atual < len(FASES) - 1:
+                resultado = "fase_concluida"
+            else:
+                resultado = "vitoria"
             game = False
             break
 
@@ -589,11 +634,13 @@ while game:
         if preenchimento.width > 0:
             pygame.draw.rect(window, (190, 135, 245), preenchimento, border_radius=8)
         texto_progresso = font_mensagem.render(f"Torre: {int(progresso_maximo * 100)}%", True, (255, 255, 255))
-        window.blit(texto_progresso, (WIDTH - 170, 44))
+        window.blit(texto_progresso, texto_progresso.get_rect(topright=(WIDTH - 15, 44)))
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
         window.blit(texto_pontos, (15, 15))
         texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
         window.blit(texto_recorde, (15, 55))
+        texto_fase = font_mensagem.render(f"Fase {fase_atual + 1}/{len(FASES)}", True, (255, 255, 255))
+        window.blit(texto_fase, (15, HEIGHT - 35))
         pygame.display.update()
 
     if resultado is not None and pontos > recorde:
@@ -611,6 +658,13 @@ while game:
                     tela_final = False
                     game = False
                 elif event.key == pygame.K_RETURN:
+                    if resultado == "fase_concluida":
+                        fase_atual += 1
+                        pontos_acumulados = pontos
+                    else:
+                        # Após derrota ou vitória final, reinicia da fase 1.
+                        fase_atual = 0
+                        pontos_acumulados = 0
                     tela_final = False
                     game = True
 
@@ -625,19 +679,28 @@ while game:
         sombra.fill((0, 0, 0, 170))
         window.blit(sombra, (0, 0))
 
-        if resultado == "vitoria":
+        if resultado == "fase_concluida":
+            titulo = f"FASE {fase_atual + 1} CONCLUÍDA!"
+            mensagem = "Prepare-se para a próxima fase!"
+            cor = (255, 220, 100)
+        elif resultado == "vitoria":
             titulo = "VITÓRIA!"
-            mensagem = "Pascal chegou à torre! 100%"
+            mensagem = "Você completou as duas fases!"
             cor = (255, 220, 100)
         else:
             titulo = "GAME OVER"
             mensagem = "Pascal caiu no chão!"
             cor = (255, 130, 130)
 
-        texto_titulo = font_final.render(titulo, True, cor)
+        fonte_titulo = font_pontos if resultado == "fase_concluida" else font_final
+        texto_titulo = fonte_titulo.render(titulo, True, cor)
         texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
         texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
-        texto_reiniciar = font_mensagem.render("ENTER para jogar novamente", True, (255, 255, 255))
+        if resultado == "fase_concluida":
+            comando = "ENTER para a próxima fase"
+        else:
+            comando = "ENTER para jogar novamente"
+        texto_reiniciar = font_mensagem.render(comando, True, (255, 255, 255))
         texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
 
         window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
