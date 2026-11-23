@@ -48,6 +48,9 @@ SOL_WIDTH = 45
 SOL_HEIGHT = 45
 
 # IMAGENS DE CADA FASE
+# A fase 1 termina na porta; a fase 2 termina na lanterna dourada.
+# Para mudar sua aparência, altere SOMENTE os nomes no segundo dicionário.
+# Coloque as novas imagens na mesma pasta deste arquivo Python.
 FASES = [
     {  # FASE 1
         'fundo': 'Torre dourada entre florestas e cachoeiras.png',
@@ -59,6 +62,9 @@ FASES = [
     },
     {  # FASE 2 — TROQUE AS IMAGENS AQUI
         'fundo': 'Castelo sob lanternas no céu noturno.png',
+        'luz': 'lanterna_dourada.png',
+        'posicao_luz': (0.50, 0.10),  # Centro como fração da largura e altura do fundo.
+        'tamanho_luz': (90, 110),
         'plataforma': 'luz flutuante.png',
         'personagem': 'pascal.png',
         'sol': 'sol.png',
@@ -84,7 +90,7 @@ def carregar_imagem(nome, transparente=False):
 
 
 def carregar_fase(numero):
-    """Carrega as imagens e a porta da fase, mantendo as mesmas mecânicas."""
+    """Carrega as imagens e o objetivo da fase: porta ou lanterna."""
     imagens = FASES[numero]
     fundo = carregar_imagem(imagens['fundo'])
     largura, altura = fundo.get_size()
@@ -99,13 +105,21 @@ def carregar_fase(numero):
     sol = pygame.transform.scale(sol, (SOL_WIDTH, SOL_HEIGHT))
 
     x, y, largura_porta, altura_porta = imagens['porta']
-    porta_fase = pygame.Rect(round(WIDTH * x), round(altura_fundo * y),
+    objetivo_fase = pygame.Rect(round(WIDTH * x), round(altura_fundo * y),
                             round(WIDTH * largura_porta), round(altura_fundo * altura_porta))
-    return fundo, altura_fundo, porta_fase, plataforma, personagem, sol
+    # Na segunda fase, o objetivo passa a ser uma imagem visível no céu.
+    luz = None
+    if 'luz' in imagens:
+        luz = carregar_imagem(imagens['luz'], True)
+        luz = pygame.transform.smoothscale(luz, imagens['tamanho_luz'])
+        centro_x, centro_y = imagens['posicao_luz']
+        objetivo_fase = luz.get_rect(center=(round(WIDTH * centro_x),
+                                            round(altura_fundo * centro_y)))
+    return fundo, altura_fundo, objetivo_fase, plataforma, personagem, sol, luz
 
 
 # Carrega a primeira fase para mostrar o cenário na tela inicial.
-background, ALTURA_FUNDO, porta, matinho_img_small, pascal_img, sol_img = carregar_fase(fase_atual)
+background, ALTURA_FUNDO, objetivo, matinho_img_small, pascal_img, sol_img, luz_img = carregar_fase(fase_atual)
 fundo_y = HEIGHT - ALTURA_FUNDO
 velocidade_fundo = 0.9
 
@@ -122,8 +136,18 @@ def intervalo_plataformas(fundo_atual):
     progresso = max(0, min(1, (fundo_atual - (HEIGHT - ALTURA_FUNDO)) / percurso))
     return round(105 + 35 * progresso)
 
-# Animação de chegada: aproxima, diminui e faz Pascal desaparecer na porta
-def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, itens, pontos):
+def desenhar_luz(tela, posicao):
+    """Desenha a lanterna com uma pequena pulsação; a porta não usa imagem extra."""
+    if luz_img is None:
+        return
+    pulso = 1 + 0.04 * math.sin(pygame.time.get_ticks() / 250)
+    tamanho = (round(luz_img.get_width() * pulso), round(luz_img.get_height() * pulso))
+    imagem = pygame.transform.smoothscale(luz_img, tamanho)
+    tela.blit(imagem, imagem.get_rect(center=posicao.center))
+
+
+# Animação de chegada: aproxima Pascal da porta ou da lanterna e o faz desaparecer.
+def animar_entrada(personagem, objetivo_destino, fundo_atual, plataformas, sois, itens, pontos):
     duracao = 1200  # milissegundos
     decorrido = 0
     personagem.speedx = 0
@@ -135,9 +159,9 @@ def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, it
         area_visivel = imagem.get_rect()
     imagem = imagem.subsurface(area_visivel).copy()
     inicio = area_visivel.move(personagem.rect.topleft).center
-    destino = porta_destino.center
-    escala_final = max(0.05, min(1, porta_destino.width * 0.75 / imagem.get_width(),
-                                      porta_destino.height * 0.85 / imagem.get_height()))
+    destino = objetivo_destino.center
+    escala_final = max(0.05, min(1, objetivo_destino.width * 0.75 / imagem.get_width(),
+                                      objetivo_destino.height * 0.85 / imagem.get_height()))
 
     # Guarda o cenário sem o personagem. Tudo fica parado durante a entrada.
     cena = pygame.Surface((WIDTH, HEIGHT))
@@ -145,9 +169,11 @@ def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, it
     plataformas.draw(cena)
     sois.draw(cena)
     itens.draw(cena)
+    desenhar_luz(cena, objetivo_destino)
     texto_pontos = font_pontos.render(f"Pontos: {pontos}", True, (128, 0, 128))
     texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
-    texto_progresso = font_mensagem.render("Torre: 100%", True, (255, 255, 255))
+    nome_progresso = "Torre" if luz_img is None else "Céu"
+    texto_progresso = font_mensagem.render(f"{nome_progresso}: 100%", True, (255, 255, 255))
     cena.blit(texto_pontos, (15, 15))
     cena.blit(texto_recorde, (15, 55))
     pygame.draw.rect(cena, (190, 135, 245), (WIDTH - 170, 20, 150, 16), border_radius=8)
@@ -173,7 +199,14 @@ def animar_entrada(personagem, porta_destino, fundo_atual, plataformas, sois, it
         posicao = quadro.get_rect(center=centro)
 
         window.blit(cena, (0, 0))
+        if luz_img is not None:
+            desenhar_luz(window, objetivo_destino)
         window.blit(quadro, posicao)
+        if luz_img is not None:
+            # Um clarão dourado acompanha o desaparecimento de Pascal na luz.
+            clarao = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            clarao.fill((255, 225, 130, round(100 * suave)))
+            window.blit(clarao, (0, 0))
         pygame.display.update()
         if progresso_animacao >= 1:
             return True
@@ -381,7 +414,7 @@ while tela_inicial and game:
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
     font_ajuda = pygame.font.SysFont("Cambria", 21)
-    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Complete as duas fases e colete sóis", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo",]
+    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Fase 1: alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo", "Fase 2: alcance a lanterna dourada!",]
     for linha, instrucao in enumerate(instrucoes):
         texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
         window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
@@ -390,7 +423,7 @@ while tela_inicial and game:
 # Cada repetição cria uma nova partida
 while game:
     # Recria cenário, personagem, plataformas e itens para a fase escolhida.
-    background, ALTURA_FUNDO, porta, matinho_img_small, pascal_img, sol_img = carregar_fase(fase_atual)
+    background, ALTURA_FUNDO, objetivo, matinho_img_small, pascal_img, sol_img, luz_img = carregar_fase(fase_atual)
     resultado = None
     fundo_y = HEIGHT - ALTURA_FUNDO
 
@@ -430,7 +463,7 @@ while game:
     itens = pygame.sprite.GroupSingle(ItemEspecial())
     escudo = False
     tempo_superpulo = 0
-    distancia_inicial_porta = max(1, player.rect.centery - (porta.centery + fundo_y))
+    distancia_inicial_objetivo = max(1, player.rect.centery - (objetivo.centery + fundo_y))
     progresso_maximo = 0
 
     while game:
@@ -547,16 +580,21 @@ while game:
                 game = False
                 break
 
-        # Posição da porta na tela, acompanhando o fundo
-        porta_tela = porta.move(0, int(fundo_y))
+        # Posição do objetivo na tela: porta na fase 1, lanterna na fase 2.
+        objetivo_tela = objetivo.move(0, int(fundo_y))
 
         # Atualiza o corpo após a correção da posição no pouso
         corpo = area_player.move(player.rect.x, player.rect.y)
 
-        # Primeiro mostra Pascal entrando; depois abre a tela de vitória.
-        if corpo.colliderect(porta_tela):
+        # Para a luz, ignora as margens transparentes da imagem na colisão.
+        area_objetivo = objetivo_tela
+        if luz_img is not None:
+            area_objetivo = luz_img.get_bounding_rect(100).move(objetivo_tela.topleft)
+
+        # A mesma chegada atende à porta da fase 1 e à lanterna da fase 2.
+        if corpo.colliderect(area_objetivo):
             tocar_som("vitoria")
-            entrou = animar_entrada(player, porta_tela, fundo_y, plataformas, sois, itens, pontos)
+            entrou = animar_entrada(player, objetivo_tela, fundo_y, plataformas, sois, itens, pontos)
             if not entrou:
                 resultado = None
             elif fase_atual < len(FASES) - 1:
@@ -609,6 +647,7 @@ while game:
         # desenha os sóis
         sois.draw(window)
         itens.draw(window)
+        desenhar_luz(window, objetivo_tela)
 
         # Desenha o personagem por último
         player.desenhar(window)
@@ -624,8 +663,8 @@ while game:
             window.blit(texto_efeitos, (15, 90))
 
         # mostra a pontuação na tela
-        distancia_porta = max(0, player.rect.centery - (porta.centery + fundo_y))
-        progresso = max(0, min(0.99, 1 - distancia_porta / distancia_inicial_porta))
+        distancia_objetivo = max(0, player.rect.centery - (objetivo.centery + fundo_y))
+        progresso = max(0, min(0.99, 1 - distancia_objetivo / distancia_inicial_objetivo))
         progresso_maximo = max(progresso_maximo, progresso)
         barra = pygame.Rect(WIDTH - 170, 20, 150, 16)
         pygame.draw.rect(window, (35, 25, 50), barra, border_radius=8)
@@ -633,7 +672,8 @@ while game:
         preenchimento.width = round(barra.width * progresso_maximo)
         if preenchimento.width > 0:
             pygame.draw.rect(window, (190, 135, 245), preenchimento, border_radius=8)
-        texto_progresso = font_mensagem.render(f"Torre: {int(progresso_maximo * 100)}%", True, (255, 255, 255))
+        nome_progresso = "Torre" if luz_img is None else "Céu"
+        texto_progresso = font_mensagem.render(f"{nome_progresso}: {int(progresso_maximo * 100)}%", True, (255, 255, 255))
         window.blit(texto_progresso, texto_progresso.get_rect(topright=(WIDTH - 15, 44)))
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
         window.blit(texto_pontos, (15, 15))
@@ -641,6 +681,9 @@ while game:
         window.blit(texto_recorde, (15, 55))
         texto_fase = font_mensagem.render(f"Fase {fase_atual + 1}/{len(FASES)}", True, (255, 255, 255))
         window.blit(texto_fase, (15, HEIGHT - 35))
+        if luz_img is not None:
+            aviso_objetivo = font_ajuda.render("Alcance a lanterna dourada!", True, (255, 230, 140))
+            window.blit(aviso_objetivo, aviso_objetivo.get_rect(center=(WIDTH // 2, HEIGHT - 55)))
         pygame.display.update()
 
     if resultado is not None and pontos > recorde:
@@ -681,11 +724,11 @@ while game:
 
         if resultado == "fase_concluida":
             titulo = f"FASE {fase_atual + 1} CONCLUÍDA!"
-            mensagem = "Prepare-se para a próxima fase!"
+            mensagem = "Agora alcance a lanterna dourada!"
             cor = (255, 220, 100)
         elif resultado == "vitoria":
             titulo = "VITÓRIA!"
-            mensagem = "Você completou as duas fases!"
+            mensagem = "Pascal alcançou a luz!"
             cor = (255, 220, 100)
         else:
             titulo = "GAME OVER"
