@@ -43,8 +43,6 @@ pygame.display.set_caption('Pascal nas Alturas')
 
 # textos
 font = pygame.font.SysFont("Cambria", 60)
-text = font.render('PASCAL', True, (128, 0, 128))
-text_ = font.render('NAS ALTURAS', True, (128, 0, 128))
 
 # mostra a pontuação
 font_pontos = pygame.font.SysFont("Cambria", 35)
@@ -81,10 +79,6 @@ FASES = [
 
 # Identifica a pasta deste arquivo para localizar as imagens do jogo.
 PASTA_JOGO = Path(__file__).resolve().parent
-# Seleciona a primeira fase, representada pelo índice zero.
-fase_atual = 0
-# Zera os pontos que poderão ser levados de uma fase para a outra.
-pontos_acumulados = 0
 
 # Carrega uma imagem usando o caminho da pasta em que este código foi salvo.
 def carregar_imagem(nome, transparente=False):
@@ -136,17 +130,13 @@ def carregar_fase(numero):
     # Devolve os recursos carregados para as variáveis que serão usadas durante a fase.
     return fundo, altura_fundo, objetivo_fase, plataforma, personagem, sol, luz
 
-# Carrega a primeira fase para mostrar o cenário na tela inicial.
-background, ALTURA_FUNDO, objetivo, matinho_img_small, pascal_img, sol_img, luz_img = carregar_fase(fase_atual)
-fundo_y = HEIGHT - ALTURA_FUNDO
 velocidade_fundo = 0.9
 
-# Guarda como o jogo terminou
-resultado = None
 
 # Fontes da tela final
 font_final = pygame.font.SysFont("Cambria", 50)
 font_mensagem = pygame.font.SysFont("Cambria", 28)
+font_ajuda = pygame.font.SysFont("Cambria", 21)
 
 # A distância cresce de 105 até 140 pixels, conforme a subida.
 def intervalo_plataformas(fundo_atual):
@@ -268,7 +258,6 @@ class Ship(pygame.sprite.Sprite):
         self.speedx = 0
         self.speedy = -15
         self.no_chao = True
-        self.bottom_anterior = self.rect.bottom
         self.olhando_esquerda = False
         self.quadro_animacao = 0
 
@@ -297,8 +286,6 @@ class Ship(pygame.sprite.Sprite):
         # Atualiza a direção para a qual Pascal olha quando existe movimento horizontal.
         if self.speedx:
             self.olhando_esquerda = self.speedx < 0
-        # Guarda a posição dos pés antes do movimento
-        self.bottom_anterior = self.rect.bottom
         self.rect.x += self.speedx
         # pulo suave
         self.speedy += 0.55
@@ -327,7 +314,6 @@ class matinho(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(0, WIDTH - self.rect.width)
         self.rect.y = y
-        self.top_anterior = self.rect.top
         # Guarda a imagem original e inicia a plataforma como normal, ativa e sem contagem para sumir.
         self.imagem_original = img
         self.tipo = "normal"
@@ -372,7 +358,6 @@ class matinho(pygame.sprite.Sprite):
     # Atualiza o deslocamento, o desaparecimento e a descida de cada plataforma.
     def update(self, personagem_movendo):
         # Guarda a posição anterior para calcular quanto a plataforma se moveu neste quadro.
-        self.top_anterior = self.rect.top
         x_anterior = self.rect.x
         # Desloca horizontalmente as plataformas móveis que ainda estão ativas.
         if self.tipo == "movel" and self.ativa:
@@ -461,15 +446,17 @@ class ItemEspecial(pygame.sprite.Sprite):
 
 # Define o arquivo JSON que guarda o recorde na mesma pasta do código.
 ARQUIVO_RECORDE = Path(__file__).resolve().with_name("recorde_pascal.json")
-# Tenta ler o recorde salvo e garante que a pontuação carregada não seja negativa.
-try:
-    dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
-    recorde = max(0, int(dados_recorde["recorde"]))
-# Começa com recorde zero se o arquivo estiver ausente, inválido ou com dados incompatíveis.
-except (OSError, ValueError, TypeError, KeyError):
-    recorde = 0
-# Guarda se ocorreu uma falha na tentativa de salvar o recorde.
-erro_recorde = False
+def carregar_recorde():
+    """Lê o recorde salvo; devolve zero se o arquivo estiver ausente ou inválido."""
+    try:
+        dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
+        return max(0, int(dados_recorde["recorde"]))
+    # Começa com recorde zero se o arquivo estiver ausente, inválido ou com dados incompatíveis.
+    except (OSError, ValueError, TypeError, KeyError):
+        return 0
+
+
+recorde = carregar_recorde()
 
 # Grava o novo recorde e informa se a operação foi concluída.
 def salvar_recorde(valor):
@@ -484,71 +471,78 @@ def salvar_recorde(valor):
 # Cria o relógio usado para controlar a velocidade de atualização das telas.
 clock = pygame.time.Clock()
 
-# Mantém os laços principais ativos enquanto o jogador não encerrar a execução.
-game = True
 
-# Tela inicial: o jogo só começa depois de apertar ENTER
-tela_inicial = True
+# TELA INICIAL
 
-# Mantém a tela inicial aberta até o jogador iniciar a partida ou sair.
-while tela_inicial and game:
-    # Limita a atualização da tela inicial a 60 quadros por segundo.
-    clock.tick(60)
-    # Percorre os eventos recebidos desde a última atualização da tela inicial.
-    for event in pygame.event.get():
-        # Processa as ações somente quando uma tecla é pressionada.
-        if event.type == pygame.KEYDOWN:
-            # Fecha a tela inicial e permite começar a primeira fase ao pressionar ENTER.
-            if event.key == pygame.K_RETURN:
-                tela_inicial = False
-            # Encerra o jogo se ESC for pressionado na tela inicial.
-            elif event.key == pygame.K_ESCAPE:
-                game = False
+def mostrar_tela_inicial():
+    """Mostra as instruções; devolve True com ENTER e False com ESC."""
+    # Carrega apenas o fundo da tela inicial, sem criar sprites que seriam descartados.
+    fundo_inicial = carregar_imagem(FASES[0]['fundo'])
+    largura, altura = fundo_inicial.get_size()
+    altura_inicial = round(altura * WIDTH / largura)
+    fundo_inicial = pygame.transform.smoothscale(fundo_inicial, (WIDTH, altura_inicial))
+    fundo_y = HEIGHT - altura_inicial
+    while True:
+        # Limita a atualização da tela inicial a 60 quadros por segundo.
+        clock.tick(60)
+        # Percorre os eventos recebidos desde a última atualização da tela inicial.
+        for event in pygame.event.get():
+            # Processa as ações somente quando uma tecla é pressionada.
+            if event.type == pygame.KEYDOWN:
+                # Fecha a tela inicial e permite começar a primeira fase ao pressionar ENTER.
+                if event.key == pygame.K_RETURN:
+                    return True
+                # Encerra o jogo se ESC for pressionado na tela inicial.
+                elif event.key == pygame.K_ESCAPE:
+                    return False
 
-    # Desenha a parte inferior do cenário como fundo da tela inicial.
-    window.blit(background, (0, int(fundo_y)))
+        # Desenha a parte inferior do cenário como fundo da tela inicial.
+        window.blit(fundo_inicial, (0, int(fundo_y)))
 
-    # Escurece o cenário para destacar os textos
-    sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    sombra.fill((0, 0, 0, 150))
-    window.blit(sombra, (0, 0))
+        # Escurece o cenário para destacar os textos
+        sombra = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        sombra.fill((0, 0, 0, 150))
+        window.blit(sombra, (0, 0))
 
-    # Prepara as imagens dos textos de título e dos comandos para iniciar ou sair.
-    titulo_pascal = font.render("PASCAL", True, (220, 180, 255))
-    titulo_nasalturas = font.render("NAS ALTURAS", True, (220, 180, 255))
-    texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
-    texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
+        # Prepara as imagens dos textos de título e dos comandos para iniciar ou sair.
+        titulo_pascal = font.render("PASCAL", True, (220, 180, 255))
+        titulo_nasalturas = font.render("NAS ALTURAS", True, (220, 180, 255))
+        texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
+        texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
 
-    # Posiciona os títulos e comandos no centro horizontal da janela.
-    window.blit(titulo_pascal, titulo_pascal.get_rect(center=(WIDTH // 2, 230)))
-    window.blit(titulo_nasalturas, titulo_nasalturas.get_rect(center=(WIDTH // 2, 300)))
-    window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
-    window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
-    # Prepara a fonte menor e a lista das instruções de controle e dos objetivos das fases.
-    font_ajuda = pygame.font.SysFont("Cambria", 21)
-    instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Fase 1: alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo", "Fase 2: alcance a lanterna dourada!",]
-    # Desenha cada instrução em uma linha, com espaçamento vertical de 30 pixels.
-    for linha, instrucao in enumerate(instrucoes):
-        texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
-        window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
-    # Apresenta na janela tudo o que foi desenhado na tela inicial.
-    pygame.display.update()
+        # Posiciona os títulos e comandos no centro horizontal da janela.
+        window.blit(titulo_pascal, titulo_pascal.get_rect(center=(WIDTH // 2, 230)))
+        window.blit(titulo_nasalturas, titulo_nasalturas.get_rect(center=(WIDTH // 2, 300)))
+        window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
+        window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
+        # Prepara a lista das instruções de controle e dos objetivos das fases.
+        instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Fase 1: alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo", "Fase 2: alcance a lanterna dourada!",]
+        # Desenha cada instrução em uma linha, com espaçamento vertical de 30 pixels.
+        for linha, instrucao in enumerate(instrucoes):
+            texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
+            window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
+        # Apresenta na janela tudo o que foi desenhado na tela inicial.
+        pygame.display.update()
 
-# Cada repetição cria uma nova partida
-while game:
+
+# PARTIDA
+
+def jogar_fase(fase_atual, pontos_iniciais):
+    """Executa uma fase e devolve seu resultado, os pontos e a posição do fundo."""
+    # Estes recursos também são usados pelas funções existentes de desenho e animação.
+    global background, ALTURA_FUNDO, luz_img
+    game = True
     # Recria cenário, personagem, plataformas e itens para a fase escolhida.
     background, ALTURA_FUNDO, objetivo, matinho_img_small, pascal_img, sol_img, luz_img = carregar_fase(fase_atual)
     resultado = None
     fundo_y = HEIGHT - ALTURA_FUNDO
 
     # Criando um grupo de matinhos
-    all_sprites = pygame.sprite.Group()
     plataformas = pygame.sprite.Group()
     # grupo dos sóis
     sois = pygame.sprite.Group()
     # Criando o jogador
     player = Ship(pascal_img)
-    all_sprites.add(player)
 
     # Criando os matinhos
     # Percorre as dez fileiras que formarão as primeiras plataformas da fase.
@@ -564,7 +558,6 @@ while game:
             # O número da fileira define a frequência e o lado da móvel.
             plataforma.configurar(coluna, i)
             plataformas.add(plataforma)
-            all_sprites.add(plataforma)
 
     # Mantém a sequência de lados ao criar novas fileiras.
     # Guarda o número da próxima fileira para manter o padrão de plataformas móveis.
@@ -573,11 +566,10 @@ while game:
     # criando o primeiro sol
     sol = Sol(sol_img)
     sois.add(sol)
-    all_sprites.add(sol)
 
     #pedido do pulo
     pedido_pulo = False
-    pontos = pontos_acumulados  # Os pontos da fase 1 continuam na fase 2.
+    pontos = pontos_iniciais  # Os pontos da fase 1 continuam na fase 2.
     # Cria um grupo com um único item especial e inicia seus efeitos como desativados.
     itens = pygame.sprite.GroupSingle(ItemEspecial())
     escudo = False
@@ -789,7 +781,6 @@ while game:
                     fim = (coluna + 1) * (WIDTH // 2)
                     plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
                     plataforma.rect.y = novo_y
-                    plataforma.top_anterior = novo_y
                     plataforma.configurar(coluna, proxima_linha)
                 # Avança o contador de fileiras depois de reposicionar a dupla.
                 proxima_linha += 1
@@ -860,45 +851,25 @@ while game:
         # Mostra o quadro completo da partida depois de desenhar todos os elementos.
         pygame.display.update()
 
-    # Atualiza e tenta salvar o recorde quando a fase terminou com uma pontuação maior.
-    if resultado is not None and pontos > recorde:
-        recorde = pontos
-        erro_recorde = not salvar_recorde(recorde)
+    return resultado, pontos, fundo_y
 
-    # Tela final: aparece apenas em caso de vitória ou queda
-    tela_final = resultado is not None
 
-    # Mantém a tela de resultado aberta até o jogador continuar ou sair.
-    while tela_final:
+# TELA DE RESULTADO
+
+def mostrar_tela_final(resultado, pontos, fundo_y, erro_recorde, fase_atual):
+    """Mostra o resultado e devolve sair, avancar ou reiniciar."""
+    while True:
         # Limita a atualização da tela de resultado a 60 quadros por segundo.
         clock.tick(60)
-        # Lê os comandos recebidos na tela de conclusão, vitória ou derrota.
+        # Devolve a escolha para main(), que decide a próxima fase ou o reinício.
         for event in pygame.event.get():
-            # Aceita os comandos de continuação ou saída quando uma tecla é pressionada.
             if event.type == pygame.KEYDOWN:
-                # Fecha a tela de resultado e encerra o jogo ao pressionar ESC.
                 if event.key == pygame.K_ESCAPE:
-                    tela_final = False
-                    game = False
-                # Continua o jogo ao pressionar ENTER, avançando ou reiniciando conforme o resultado.
+                    return "sair"
                 elif event.key == pygame.K_RETURN:
-                    # Avança uma fase e leva os pontos conquistados quando a fase anterior foi concluída.
                     if resultado == "fase_concluida":
-                        fase_atual += 1
-                        pontos_acumulados = pontos
-                    else:
-                        # Após derrota ou vitória final, reinicia da fase 1.
-                        # Seleciona a primeira fase, representada pelo índice zero.
-                        fase_atual = 0
-                        # Zera os pontos que poderão ser levados de uma fase para a outra.
-                        pontos_acumulados = 0
-                    # Fecha a tela de resultado e permite que o laço externo prepare a próxima partida.
-                    tela_final = False
-                    game = True
-
-        # Interrompe o desenho desta tela assim que ela for fechada pelo jogador.
-        if not tela_final:
-            break
+                        return "avancar"
+                    return "reiniciar"
 
         # Desenha o cenário atrás da mensagem
         window.blit(background, (0, int(fundo_y)))
@@ -953,5 +924,43 @@ while game:
 
         pygame.display.update()
 
-# Libera os recursos do Pygame e fecha sua janela ao terminar a execução.
-pygame.quit()
+
+# CONTROLE DAS TELAS E FASES
+
+def main():
+    """Organiza a tela inicial, as duas fases, o recorde e o reinício."""
+    global recorde
+    fase_atual = 0
+    pontos_acumulados = 0
+    erro_recorde = False
+
+    try:
+        if not mostrar_tela_inicial():
+            return
+
+        while True:
+            resultado, pontos, fundo_y = jogar_fase(fase_atual, pontos_acumulados)
+            # ESC durante a partida ou a animação encerra sem mostrar o resultado.
+            if resultado is None:
+                return
+
+            if pontos > recorde:
+                recorde = pontos
+                erro_recorde = not salvar_recorde(recorde)
+
+            acao = mostrar_tela_final(resultado, pontos, fundo_y, erro_recorde, fase_atual)
+            if acao == "sair":
+                return
+            elif acao == "avancar":
+                fase_atual += 1
+                pontos_acumulados = pontos
+            else:
+                fase_atual = 0
+                pontos_acumulados = 0
+    finally:
+        # Libera os recursos mesmo se ocorrer um erro durante a execução.
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
