@@ -249,6 +249,10 @@ class Ship(pygame.sprite.Sprite):
         self.speedy += 0.55
         #  movimento vertical contínuo
         self.rect.y += self.speedy
+        # proteção para o personagem nao sair pelo teto
+        if self.rect.top < 0:
+            self.rect.top = 0
+            self.speedy = 0
         # Limites laterais
         if self.rect.right > WIDTH:
             self.rect.right = WIDTH
