@@ -1,4 +1,3 @@
-# Importa o Pygame e as ferramentas para sorteios, cálculos, sons, caminhos e arquivos JSON.
 import pygame
 import random
 import math
@@ -138,13 +137,16 @@ font_final = pygame.font.SysFont("Cambria", 50)
 font_mensagem = pygame.font.SysFont("Cambria", 28)
 font_ajuda = pygame.font.SysFont("Cambria", 21)
 
-# A distância cresce de 105 até 140 pixels, conforme a subida.
+# Espaçamento: fase 1 de 105 a 140 pixels; fase 2 de 120 a 155 pixels.
 def intervalo_plataformas(fundo_atual):
     # Calcula quanto o fundo pode percorrer, garantindo um divisor maior que zero.
     percurso = max(1, ALTURA_FUNDO - HEIGHT)
     # Converte a posição atual do fundo em um progresso entre zero e um.
     progresso = max(0, min(1, (fundo_atual - (HEIGHT - ALTURA_FUNDO)) / percurso))
-    # Transforma o progresso em um espaçamento inteiro entre 105 e 140 pixels.
+    # A fase da lanterna recebe mais 15 pixels de distância entre as fileiras.
+    if luz_img is not None:
+        return round(120 + 35 * progresso)
+    # Mantém o espaçamento original na primeira fase.
     return round(105 + 35 * progresso)
 
 # Mostra a lanterna especial sem criar uma imagem adicional para a porta da primeira fase.
@@ -158,7 +160,10 @@ def desenhar_luz(tela, posicao):
     tamanho = (round(luz_img.get_width() * pulso), round(luz_img.get_height() * pulso))
     imagem = pygame.transform.smoothscale(luz_img, tamanho)
     # Desenha a lanterna redimensionada mantendo o mesmo centro do objetivo.
-    tela.blit(imagem, imagem.get_rect(center=posicao.center))
+    retangulo = imagem.get_rect(center=posicao.center)
+    if tela is not None:
+        tela.blit(imagem, retangulo)
+    return imagem, retangulo
 
 # Animação de chegada: aproxima Pascal da porta ou da lanterna e o faz desaparecer.
 def animar_entrada(personagem, objetivo_destino, fundo_atual, plataformas, sois, itens, pontos):
@@ -277,7 +282,10 @@ class Ship(pygame.sprite.Sprite):
             tamanho = (PASCAL_WIDTH, PASCAL_HEIGHT)
         # Desenha a imagem animada mantendo seus pés alinhados com o retângulo do personagem.
         imagem = pygame.transform.smoothscale(imagem, tamanho)
-        tela.blit(imagem, imagem.get_rect(midbottom=self.rect.midbottom))
+        retangulo = imagem.get_rect(midbottom=self.rect.midbottom)
+        if tela is not None:
+            tela.blit(imagem, retangulo)
+        return imagem, retangulo
 
     # Atualiza a animação, as velocidades e os limites do personagem a cada quadro.
     def update(self):
@@ -674,7 +682,10 @@ def jogar_fase(fase_atual, pontos_iniciais):
             # Calcula a área visível de apoio e verifica a sobreposição na horizontal.
             area = plataforma.image.get_bounding_rect()
             apoio = area.move(plataforma.rect.x, plataforma.rect.y)
-            sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
+            # Calcula quanto da largura visível de Pascal está sobre esta plataforma.
+            largura_sobreposta = max(0, min(corpo.right, apoio.right) - max(corpo.left, apoio.left))
+            # Só permite apoio quando mais da metade do personagem está sobre ela.
+            sobrepoe_x = largura_sobreposta > corpo.width * 0.5
             # Compara a distância dos pés até o apoio antes e depois do movimento.
             distancia_antes = (topos_antes[plataforma] - pes_antes)
             distancia_depois = (apoio.centery - corpo.bottom)
@@ -727,14 +738,23 @@ def jogar_fase(fase_atual, pontos_iniciais):
         # Atualiza o corpo após a correção da posição no pouso
         corpo = area_player.move(player.rect.x, player.rect.y)
 
-        # Para a luz, ignora as margens transparentes da imagem na colisão.
-        area_objetivo = objetivo_tela
-        # Usa a parte mais opaca da lanterna, sem as margens transparentes, como área de chegada.
-        if luz_img is not None:
-            area_objetivo = luz_img.get_bounding_rect(100).move(objetivo_tela.topleft)
+        # Usa os mesmos pixels, tamanho e direção que serão desenhados para Pascal.
+        imagem_pascal, retangulo_pascal = player.desenhar(None)
+        mascara_pascal = pygame.mask.from_surface(imagem_pascal)
 
-        # A mesma chegada atende à porta da fase 1 e à lanterna da fase 2.
-        if corpo.colliderect(area_objetivo):
+        # Na porta, só considera contato com a área configurada da abertura.
+        if luz_img is None:
+            retangulo_objetivo = objetivo_tela
+            mascara_objetivo = pygame.mask.Mask(objetivo_tela.size, fill=True)
+        # Na lanterna, usa sua forma visível e o tamanho atual da pulsação.
+        else:
+            imagem_luz, retangulo_objetivo = desenhar_luz(None, objetivo_tela)
+            mascara_objetivo = pygame.mask.from_surface(imagem_luz, 100)
+
+        # A chegada só acontece quando os pixels de Pascal tocam o objetivo.
+        deslocamento = (retangulo_objetivo.x - retangulo_pascal.x,
+                        retangulo_objetivo.y - retangulo_pascal.y)
+        if mascara_pascal.overlap(mascara_objetivo, deslocamento) is not None:
             tocar_som("vitoria")
             entrou = animar_entrada(player, objetivo_tela, fundo_y, plataformas, sois, itens, pontos)
             # Se ESC interrompeu a animação, encerra sem exibir uma tela de resultado.
@@ -800,7 +820,8 @@ def jogar_fase(fase_atual, pontos_iniciais):
         sois.draw(window)
         # Desenha os itens especiais e a lanterna da segunda fase antes do personagem.
         itens.draw(window)
-        desenhar_luz(window, objetivo_tela)
+        if luz_img is not None:
+            window.blit(imagem_luz, retangulo_objetivo)
 
         # Desenha o personagem por último
         player.desenhar(window)
