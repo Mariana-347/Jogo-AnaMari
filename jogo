@@ -1,9 +1,9 @@
+# Importa o Pygame e as ferramentas para sorteios, cálculos, sons, caminhos e arquivos JSON.
 import pygame
 import random
 import math
 from array import array
 from pathlib import Path
-import json
 
 # Configura o áudio antes de iniciar o Pygame: 22050 Hz, amostras de 16 bits e um canal.
 pygame.mixer.pre_init(22050, -16, 1, 512, allowedchanges=0)
@@ -452,29 +452,21 @@ class ItemEspecial(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.novo_item()
 
-# Define o arquivo JSON que guarda o recorde na mesma pasta do código.
-ARQUIVO_RECORDE = Path(__file__).resolve().with_name("recorde_pascal.json")
+# O recorde começa em zero e existe somente enquanto o jogo está aberto.
+RECORDE_SALVO = 0
+
 def carregar_recorde():
-    """Lê o recorde salvo; devolve zero se o arquivo estiver ausente ou inválido."""
-    try:
-        dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
-        return max(0, int(dados_recorde["recorde"]))
-    # Começa com recorde zero se o arquivo estiver ausente, inválido ou com dados incompatíveis.
-    except (OSError, ValueError, TypeError, KeyError):
-        return 0
+    """Inicia o recorde em zero ao abrir o jogo."""
+    return 0
 
 
 recorde = carregar_recorde()
 
-# Grava o novo recorde e informa se a operação foi concluída.
+# Mantém o recorde apenas na memória, sem gravar arquivos.
 def salvar_recorde(valor):
-    # Tenta escrever a pontuação no arquivo usando o formato JSON.
-    try:
-        ARQUIVO_RECORDE.write_text(json.dumps({"recorde": valor}), encoding="utf-8")
-        return True
-    # Informa a falha se não for possível escrever no arquivo.
-    except OSError:
-        return False
+    global RECORDE_SALVO
+    RECORDE_SALVO = max(RECORDE_SALVO, int(valor))
+    return True
 
 # Cria o relógio usado para controlar a velocidade de atualização das telas.
 clock = pygame.time.Clock()
@@ -633,8 +625,8 @@ def jogar_fase(fase_atual, pontos_iniciais):
         # Guarda a altura de apoio de cada plataforma antes de movimentá-la.
         for plataforma in plataformas:
             area = plataforma.image.get_bounding_rect()
-            # Usa o centro vertical da área visível do matinho como altura de apoio.
-            topos_antes[plataforma] = (plataforma.rect.y + area.centery)
+            # Nas lanternas, apoia 20 pixels abaixo do topo visível para aproximar os pés.
+            topos_antes[plataforma] = plataforma.rect.y + (area.top + 20 if luz_img is not None else area.centery)
 
         # Movimenta o personagem e as plataformas
         player.update()
@@ -684,11 +676,11 @@ def jogar_fase(fase_atual, pontos_iniciais):
             apoio = area.move(plataforma.rect.x, plataforma.rect.y)
             # Calcula quanto da largura visível de Pascal está sobre esta plataforma.
             largura_sobreposta = max(0, min(corpo.right, apoio.right) - max(corpo.left, apoio.left))
-            # Só permite apoio quando mais da metade do personagem está sobre ela.
-            sobrepoe_x = largura_sobreposta > corpo.width * 0.5
+            # Exige mais de 30% de apoio nas lanternas e mais de 50% nos matinhos.
+            sobrepoe_x = largura_sobreposta > corpo.width * (0.3 if luz_img is not None else 0.5)
             # Compara a distância dos pés até o apoio antes e depois do movimento.
             distancia_antes = (topos_antes[plataforma] - pes_antes)
-            distancia_depois = (apoio.centery - corpo.bottom)
+            distancia_depois = (apoio.top + 20 if luz_img is not None else apoio.centery) - corpo.bottom
 
             # Verifica se os pés alcançaram a plataforma por cima
             if (sobrepoe_x and distancia_antes >= 0 and distancia_depois <= 0 and player.speedy >= 0):
@@ -704,8 +696,8 @@ def jogar_fase(fase_atual, pontos_iniciais):
         # Se houve pouso, corrige a posição dos pés e atualiza o estado de apoio.
         if plataforma_pouso is not None:
             area = plataforma_pouso.image.get_bounding_rect()
-            topo = plataforma_pouso.rect.y + area.centery
-            # Coloca os pés visíveis exatamente sobre o matinho
+            topo = plataforma_pouso.rect.y + (area.top + 20 if luz_img is not None else area.centery)
+            # Alinha os pés 20 pixels abaixo do topo da lanterna ou ao apoio original do matinho
             player.rect.y = topo - area_player.bottom
             player.speedy = 0
             player.no_chao = True
@@ -961,13 +953,14 @@ def main():
 
         while True:
             resultado, pontos, fundo_y = jogar_fase(fase_atual, pontos_acumulados)
-            # ESC durante a partida ou a animação encerra sem mostrar o resultado.
-            if resultado is None:
-                return
-
+            # Atualiza o recorde da execução atual, inclusive ao sair com ESC.
             if pontos > recorde:
                 recorde = pontos
                 erro_recorde = not salvar_recorde(recorde)
+
+            # ESC durante a partida ou a animação encerra sem mostrar o resultado.
+            if resultado is None:
+                return
 
             acao = mostrar_tela_final(resultado, pontos, fundo_y, erro_recorde, fase_atual)
             if acao == "sair":
