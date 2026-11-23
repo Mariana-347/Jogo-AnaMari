@@ -1,3 +1,4 @@
+# Importa o Pygame e as ferramentas para sorteios, cálculos, sons, caminhos e arquivos JSON.
 import pygame
 import random
 import math
@@ -5,21 +6,30 @@ from array import array
 from pathlib import Path
 import json
 
+# Configura o áudio antes de iniciar o Pygame: 22050 Hz, amostras de 16 bits e um canal.
 pygame.mixer.pre_init(22050, -16, 1, 512, allowedchanges=0)
+# Inicializa os módulos disponíveis do Pygame.
 pygame.init()
 
 # Efeitos simples; o jogo também funciona se o computador não tiver áudio.
 def criar_som(frequencia, duracao):
+    # Se o áudio não foi inicializado, devolve None para o jogo continuar sem esse som.
     if pygame.mixer.get_init() is None:
         return None
+    # Obtém a taxa de áudio e calcula quantas amostras serão necessárias para a duração escolhida.
     taxa = pygame.mixer.get_init()[0]
     total = int(taxa * duracao)
+    # Gera uma onda senoidal com volume decrescente e a guarda como números inteiros de 16 bits.
     amostras = array("h", (int(7000 * math.sin(2 * math.pi * frequencia * i / taxa) * (1 - i / total)) for i in range(total)))
+    # Transforma as amostras em um efeito sonoro que o Pygame consegue reproduzir.
     return pygame.mixer.Sound(buffer=amostras)
 
+# Cria os efeitos de pulo, coleta, derrota e vitória, cada um com frequência e duração próprias.
 sons = {"pulo": criar_som(600, 0.12), "sol": criar_som(1000, 0.18), "game_over": criar_som(150, 0.5), "vitoria": criar_som(850, 0.6),}
 
+# Reproduz o efeito identificado pelo nome recebido.
 def tocar_som(nome):
+    # Só tenta reproduzir o som se ele tiver sido criado com sucesso.
     if sons[nome] is not None:
         sons[nome].play()
 
@@ -58,8 +68,7 @@ FASES = [
         'personagem': 'pascal.png',
         'sol': 'sol.png',
         # Porta: posição x, posição y, largura e altura como frações do fundo.
-        'porta': (0.46, 0.055, 0.09, 0.03),
-    },
+        'porta': (0.46, 0.055, 0.09, 0.03),},
     {  # FASE 2 — TROQUE AS IMAGENS AQUI
         'fundo': 'Castelo sob lanternas no céu noturno.png',
         'luz': 'lanterna_dourada.png',
@@ -68,35 +77,42 @@ FASES = [
         'plataforma': 'luz flutuante.png',
         'personagem': 'pascal.png',
         'sol': 'sol.png',
-        'porta': (0.46, 0.055, 0.09, 0.03),
-    },
-]
+        'porta': (0.46, 0.055, 0.09, 0.03),}]
 
+# Identifica a pasta deste arquivo para localizar as imagens do jogo.
 PASTA_JOGO = Path(__file__).resolve().parent
+# Seleciona a primeira fase, representada pelo índice zero.
 fase_atual = 0
+# Zera os pontos que poderão ser levados de uma fase para a outra.
 pontos_acumulados = 0
 
-
+# Carrega uma imagem usando o caminho da pasta em que este código foi salvo.
 def carregar_imagem(nome, transparente=False):
     """Abre uma imagem da pasta do jogo."""
+    # Junta o nome recebido à pasta do jogo para obter o caminho completo da imagem.
     caminho = PASTA_JOGO / nome
     # Aceita também o nome com (1) usado no arquivo de fundo enviado.
     if not caminho.exists() and nome == 'Torre dourada entre florestas e cachoeiras.png':
         caminho = PASTA_JOGO / 'Torre dourada entre florestas e cachoeiras(1).png'
+    # Lê o arquivo da imagem antes de convertê-lo para o formato usado pela janela.
     imagem = pygame.image.load(str(caminho))
+    # Preserva o canal de transparência quando ele for necessário para o desenho.
     if transparente:
         return imagem.convert_alpha()
+    # Para imagens opacas, usa a conversão comum, adequada ao fundo do cenário.
     return imagem.convert()
 
-
+# Prepara todas as imagens e o retângulo de chegada da fase selecionada.
 def carregar_fase(numero):
     """Carrega as imagens e o objetivo da fase: porta ou lanterna."""
+    # Seleciona a configuração da fase e redimensiona o fundo sem mudar sua proporção.
     imagens = FASES[numero]
     fundo = carregar_imagem(imagens['fundo'])
     largura, altura = fundo.get_size()
     altura_fundo = round(altura * WIDTH / largura)
     fundo = pygame.transform.smoothscale(fundo, (WIDTH, altura_fundo))
 
+    # Carrega a plataforma, o personagem e o sol nos tamanhos definidos no início do código.
     plataforma = carregar_imagem(imagens['plataforma'], True)
     plataforma = pygame.transform.scale(plataforma, (MATINHO_WIDTH, MATINHO_HEIGHT))
     personagem = carregar_imagem(imagens['personagem'], True)
@@ -104,19 +120,21 @@ def carregar_fase(numero):
     sol = carregar_imagem(imagens['sol'], True)
     sol = pygame.transform.scale(sol, (SOL_WIDTH, SOL_HEIGHT))
 
+    # Converte as frações da porta em coordenadas e dimensões em pixels no fundo.
     x, y, largura_porta, altura_porta = imagens['porta']
     objetivo_fase = pygame.Rect(round(WIDTH * x), round(altura_fundo * y),
                             round(WIDTH * largura_porta), round(altura_fundo * altura_porta))
     # Na segunda fase, o objetivo passa a ser uma imagem visível no céu.
     luz = None
+    # Se a fase tiver uma lanterna, carrega sua imagem e usa sua posição como objetivo.
     if 'luz' in imagens:
         luz = carregar_imagem(imagens['luz'], True)
         luz = pygame.transform.smoothscale(luz, imagens['tamanho_luz'])
         centro_x, centro_y = imagens['posicao_luz']
         objetivo_fase = luz.get_rect(center=(round(WIDTH * centro_x),
                                             round(altura_fundo * centro_y)))
+    # Devolve os recursos carregados para as variáveis que serão usadas durante a fase.
     return fundo, altura_fundo, objetivo_fase, plataforma, personagem, sol, luz
-
 
 # Carrega a primeira fase para mostrar o cenário na tela inicial.
 background, ALTURA_FUNDO, objetivo, matinho_img_small, pascal_img, sol_img, luz_img = carregar_fase(fase_atual)
@@ -132,36 +150,46 @@ font_mensagem = pygame.font.SysFont("Cambria", 28)
 
 # A distância cresce de 105 até 140 pixels, conforme a subida.
 def intervalo_plataformas(fundo_atual):
+    # Calcula quanto o fundo pode percorrer, garantindo um divisor maior que zero.
     percurso = max(1, ALTURA_FUNDO - HEIGHT)
+    # Converte a posição atual do fundo em um progresso entre zero e um.
     progresso = max(0, min(1, (fundo_atual - (HEIGHT - ALTURA_FUNDO)) / percurso))
+    # Transforma o progresso em um espaçamento inteiro entre 105 e 140 pixels.
     return round(105 + 35 * progresso)
 
+# Mostra a lanterna especial sem criar uma imagem adicional para a porta da primeira fase.
 def desenhar_luz(tela, posicao):
     """Desenha a lanterna com uma pequena pulsação; a porta não usa imagem extra."""
+    # Interrompe apenas esta função quando a fase atual não tiver uma imagem de lanterna.
     if luz_img is None:
         return
+    # Usa o tempo para variar levemente o tamanho da lanterna, criando uma pulsação.
     pulso = 1 + 0.04 * math.sin(pygame.time.get_ticks() / 250)
     tamanho = (round(luz_img.get_width() * pulso), round(luz_img.get_height() * pulso))
     imagem = pygame.transform.smoothscale(luz_img, tamanho)
+    # Desenha a lanterna redimensionada mantendo o mesmo centro do objetivo.
     tela.blit(imagem, imagem.get_rect(center=posicao.center))
-
 
 # Animação de chegada: aproxima Pascal da porta ou da lanterna e o faz desaparecer.
 def animar_entrada(personagem, objetivo_destino, fundo_atual, plataformas, sois, itens, pontos):
+    # Define a duração da animação e zera as velocidades para interromper o movimento normal.
     duracao = 1200  # milissegundos
     decorrido = 0
     personagem.speedx = 0
     personagem.speedy = 0
 
     imagem = pygame.transform.flip(personagem.image, personagem.olhando_esquerda, False)
+    # Identifica a parte não transparente de Pascal para usá-la na animação.
     area_visivel = imagem.get_bounding_rect()
+    # Se a imagem não tiver uma área visível, usa seu retângulo completo como alternativa.
     if area_visivel.width == 0 or area_visivel.height == 0:
         area_visivel = imagem.get_rect()
+    # Recorta a área visível e define os centros de saída e chegada da animação.
     imagem = imagem.subsurface(area_visivel).copy()
     inicio = area_visivel.move(personagem.rect.topleft).center
     destino = objetivo_destino.center
-    escala_final = max(0.05, min(1, objetivo_destino.width * 0.75 / imagem.get_width(),
-                                      objetivo_destino.height * 0.85 / imagem.get_height()))
+    # Calcula uma escala final que caiba dentro do retângulo do objetivo.
+    escala_final = max(0.05, min(1, objetivo_destino.width * 0.75 / imagem.get_width(), objetivo_destino.height * 0.85 / imagem.get_height()))
 
     # Guarda o cenário sem o personagem. Tudo fica parado durante a entrada.
     cena = pygame.Surface((WIDTH, HEIGHT))
@@ -170,55 +198,73 @@ def animar_entrada(personagem, objetivo_destino, fundo_atual, plataformas, sois,
     sois.draw(cena)
     itens.draw(cena)
     desenhar_luz(cena, objetivo_destino)
+    # Prepara os textos de pontuação, recorde e progresso completo que ficarão sobre o cenário.
     texto_pontos = font_pontos.render(f"Pontos: {pontos}", True, (128, 0, 128))
     texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
     nome_progresso = "Torre" if luz_img is None else "Céu"
     texto_progresso = font_mensagem.render(f"{nome_progresso}: 100%", True, (255, 255, 255))
+    # Desenha os textos e a barra preenchida na cópia do cenário.
     cena.blit(texto_pontos, (15, 15))
     cena.blit(texto_recorde, (15, 55))
     pygame.draw.rect(cena, (190, 135, 245), (WIDTH - 170, 20, 150, 16), border_radius=8)
     cena.blit(texto_progresso, texto_progresso.get_rect(topright=(WIDTH - 15, 44)))
 
+    # Repete os quadros da chegada até completar a duração ou receber ESC.
     while True:
         # Continua lendo os eventos, sem usar esperas que travem a janela.
         for event in pygame.event.get():
+            # Permite sair da animação com ESC e informa que a chegada foi cancelada.
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return False
 
+        # Converte o tempo decorrido em uma fração de 0 a 1 e suaviza o início e o fim do movimento.
         progresso_animacao = min(1, decorrido / duracao)
         suave = progresso_animacao * progresso_animacao * (3 - 2 * progresso_animacao)
         escala = 1 + (escala_final - 1) * suave
+        # Calcula o novo tamanho de Pascal e redimensiona sua imagem para este quadro.
         tamanho = (max(1, round(imagem.get_width() * escala)),
                    max(1, round(imagem.get_height() * escala)))
         quadro = pygame.transform.smoothscale(imagem, tamanho)
         # Desaparece aos poucos na segunda metade da entrada.
         opacidade = round(255 * (1 - max(0, (progresso_animacao - 0.55) / 0.45)))
         quadro.set_alpha(max(0, min(255, opacidade)))
+        # Move o centro de Pascal gradualmente da posição inicial até o objetivo.
         centro = (round(inicio[0] + (destino[0] - inicio[0]) * suave),
                   round(inicio[1] + (destino[1] - inicio[1]) * suave))
         posicao = quadro.get_rect(center=centro)
 
+        # Restaura o cenário parado antes de desenhar o quadro atual de Pascal.
         window.blit(cena, (0, 0))
+        # Atualiza a pulsação da lanterna durante a animação da segunda fase.
         if luz_img is not None:
             desenhar_luz(window, objetivo_destino)
+        # Desenha Pascal na posição e no tamanho calculados para este quadro.
         window.blit(quadro, posicao)
+        # Aplica o efeito de luz somente quando a chegada acontece na lanterna.
         if luz_img is not None:
             # Um clarão dourado acompanha o desaparecimento de Pascal na luz.
             clarao = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             clarao.fill((255, 225, 130, round(100 * suave)))
             window.blit(clarao, (0, 0))
+        # Exibe o quadro da animação na janela.
         pygame.display.update()
+        # Quando a animação termina, informa que Pascal alcançou o objetivo.
         if progresso_animacao >= 1:
             return True
+        # Soma os milissegundos do último quadro e limita a animação a 60 quadros por segundo.
         decorrido += clock.tick(60)
 
+# Define o personagem como um sprite, com imagem, posição, velocidades e animação.
 class Ship(pygame.sprite.Sprite):
+    # Inicializa Pascal no centro horizontal, próximo à parte inferior da janela.
     def __init__(self, img):
         pygame.sprite.Sprite.__init__(self)
+        # Guarda a imagem e cria o retângulo que será usado para posicionar o personagem.
         self.image = img
         self.rect = self.image.get_rect()
         self.rect.centerx = WIDTH / 2
         self.rect.bottom = HEIGHT - 10
+        # Define as velocidades e os estados iniciais de apoio, direção e animação.
         self.speedx = 0
         self.speedy = -15
         self.no_chao = True
@@ -226,20 +272,29 @@ class Ship(pygame.sprite.Sprite):
         self.olhando_esquerda = False
         self.quadro_animacao = 0
 
+    # Desenha a imagem de Pascal com orientação e tamanho que dependem do movimento.
     def desenhar(self, tela):
+        # Espelha a imagem quando Pascal está olhando para a esquerda.
         imagem = pygame.transform.flip(self.image, self.olhando_esquerda, False)
+        # Estica levemente a imagem na vertical enquanto Pascal estiver no ar.
         if not self.no_chao:
             tamanho = (PASCAL_WIDTH - 6, PASCAL_HEIGHT + 6)
+        # Alterna pequenas deformações da imagem para simular movimento ao andar.
         elif self.speedx:
             oscilacao = 3 if (self.quadro_animacao // 6) % 2 else -3
             tamanho = (PASCAL_WIDTH + oscilacao, PASCAL_HEIGHT - oscilacao)
+        # Mantém o tamanho normal quando Pascal está parado e apoiado.
         else:
             tamanho = (PASCAL_WIDTH, PASCAL_HEIGHT)
+        # Desenha a imagem animada mantendo seus pés alinhados com o retângulo do personagem.
         imagem = pygame.transform.smoothscale(imagem, tamanho)
         tela.blit(imagem, imagem.get_rect(midbottom=self.rect.midbottom))
 
+    # Atualiza a animação, as velocidades e os limites do personagem a cada quadro.
     def update(self):
+        # Avança o contador usado para alternar os quadros da animação de caminhada.
         self.quadro_animacao += 1
+        # Atualiza a direção para a qual Pascal olha quando existe movimento horizontal.
         if self.speedx:
             self.olhando_esquerda = self.speedx < 0
         # Guarda a posição dos pés antes do movimento
@@ -256,6 +311,7 @@ class Ship(pygame.sprite.Sprite):
         # Limites laterais
         if self.rect.right > WIDTH:
             self.rect.right = WIDTH
+        # Impede que o personagem ultrapasse a lateral esquerda da janela.
         if self.rect.left < 0:
             self.rect.left = 0
         # A colisão verificará se continua apoiado
@@ -263,13 +319,16 @@ class Ship(pygame.sprite.Sprite):
 
 # cria novas plataformas (matinhos)
 class matinho(pygame.sprite.Sprite):
+    # Cria uma plataforma com altura recebida e dados para controlar seus possíveis comportamentos.
     def __init__(self, img, y):
         pygame.sprite.Sprite.__init__(self)
+        # Define a imagem, o retângulo e a posição inicial da plataforma.
         self.image = img
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(0, WIDTH - self.rect.width)
         self.rect.y = y
         self.top_anterior = self.rect.top
+        # Guarda a imagem original e inicia a plataforma como normal, ativa e sem contagem para sumir.
         self.imagem_original = img
         self.tipo = "normal"
         self.ativa = True
@@ -279,40 +338,55 @@ class matinho(pygame.sprite.Sprite):
         self.limite_esquerdo = 0
         self.limite_direito = WIDTH - self.rect.width
 
+    # Configura a plataforma conforme sua coluna e o número da fileira.
     def configurar(self, coluna, numero_linha):
         # Uma plataforma móvel a cada quatro fileiras.
         # Os lados se alternam: esquerda, direita, esquerda, direita...
         linha_movel = numero_linha % 4 == 3
         lado_movel = (numero_linha // 4) % 2
+        # Nas fileiras móveis, escolhe qual das duas colunas terá uma plataforma em movimento.
         if linha_movel:
             self.tipo = "movel" if coluna == lado_movel else "normal"
+        # Nas outras fileiras após a primeira, sorteia uma plataforma normal ou frágil na coluna direita.
         elif numero_linha > 0 and coluna == 1:
             self.tipo = random.choice(["normal", "fragil"])
+        # Mantém as demais plataformas como normais.
         else:
             self.tipo = "normal"
+        # Reativa a plataforma e reinicia os dados de movimento e desaparecimento.
         self.ativa = True
         self.tempo_sumir = None
         self.direcao = random.choice([-1, 1])
         self.delta_x = 0
+        # Limita o deslocamento horizontal à metade da tela correspondente à coluna.
         self.limite_esquerdo = coluna * (WIDTH // 2)
         self.limite_direito = (coluna + 1) * (WIDTH // 2) - self.rect.width
         self.image = self.imagem_original.copy()
+        # Aplica uma tonalidade azul às plataformas móveis.
         if self.tipo == "movel":
             self.image.fill((150, 200, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
+        # Aplica uma tonalidade alaranjada às plataformas frágeis.
         elif self.tipo == "fragil":
             self.image.fill((255, 180, 140, 255), special_flags=pygame.BLEND_RGBA_MULT)
 
+    # Atualiza o deslocamento, o desaparecimento e a descida de cada plataforma.
     def update(self, personagem_movendo):
+        # Guarda a posição anterior para calcular quanto a plataforma se moveu neste quadro.
         self.top_anterior = self.rect.top
         x_anterior = self.rect.x
+        # Desloca horizontalmente as plataformas móveis que ainda estão ativas.
         if self.tipo == "movel" and self.ativa:
             self.rect.x += self.direcao * 2
+            # Ao atingir um limite da coluna, corrige a posição e inverte a direção.
             if self.rect.x <= self.limite_esquerdo or self.rect.x >= self.limite_direito:
                 self.rect.x = max(self.limite_esquerdo, min(self.limite_direito, self.rect.x))
                 self.direcao *= -1
+        # Calcula o deslocamento horizontal que também poderá transportar Pascal durante o pouso.
         self.delta_x = self.rect.x - x_anterior
+        # Se a plataforma frágil já foi tocada, diminui o tempo restante para desaparecer.
         if self.tempo_sumir is not None:
             self.tempo_sumir -= 1
+            # Quando o tempo acaba, desativa a plataforma e substitui sua imagem por uma superfície transparente.
             if self.tempo_sumir <= 0:
                 self.ativa = False
                 self.image = pygame.Surface(self.imagem_original.get_size(), pygame.SRCALPHA)
@@ -323,17 +397,20 @@ class matinho(pygame.sprite.Sprite):
 # classe do solzinho
 # O jogador ganha pontos quando encosta no sol.
 class Sol(pygame.sprite.Sprite):
+    # Cria um sol coletável e sorteia sua primeira posição.
     def __init__(self, img):
         pygame.sprite.Sprite.__init__(self)
         self.image = img
         self.rect = self.image.get_rect()
         self.novo_sol()
 
+    # Reposiciona o sol dentro dos intervalos definidos para a tela.
     def novo_sol(self):
         # Posiciona o sol em um local aleatório da tela
         self.rect.x = random.randint(150, WIDTH - self.rect.width)
         self.rect.y = random.randint(100, HEIGHT - 200)
 
+    # Faz o sol acompanhar a descida do cenário e reaparecer quando sai da janela.
     def update(self, personagem_movendo):
         # O sol acompanha o movimento da tela
         if personagem_movendo:
@@ -342,65 +419,93 @@ class Sol(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT:
             self.novo_sol()
 
+# Define os itens que concedem escudo ou superpulo ao personagem.
 class ItemEspecial(pygame.sprite.Sprite):
+    # Cria uma superfície transparente para desenhar o item e sorteia o primeiro tipo.
     def __init__(self):
         super().__init__()
         self.image = pygame.Surface((36, 36), pygame.SRCALPHA)
         self.rect = self.image.get_rect()
         self.novo_item()
 
+    # Sorteia o tipo de item, desenha seu símbolo e escolhe onde ele aparecerá.
     def novo_item(self):
+        # Escolhe entre escudo e superpulo e limpa o desenho do item anterior.
         self.tipo = random.choice(["escudo", "pulo"])
         self.image.fill((0, 0, 0, 0))
+        # Desenha um polígono azul para representar o escudo.
         if self.tipo == "escudo":
             pygame.draw.polygon(self.image, (90, 210, 255), [(18, 1), (33, 7), (30, 24), (18, 35), (6, 24), (3, 7)])
+        # Para o superpulo, monta uma estrela amarela alternando pontas longas e curtas.
         else:
             pontas = []
+            # Calcula os dez vértices da estrela usando os ângulos de uma volta completa.
             for i in range(10):
                 angulo = -math.pi / 2 + i * math.pi / 5
                 raio = 17 if i % 2 == 0 else 8
                 pontas.append((18 + math.cos(angulo) * raio, 18 + math.sin(angulo) * raio))
+            # Une os vértices calculados para preencher o desenho da estrela.
             pygame.draw.polygon(self.image, (255, 220, 80), pontas)
+        # Sorteia a posição horizontal e coloca o item acima da parte visível da janela.
         self.rect.x = random.randint(30, WIDTH - 66)
         self.rect.y = -random.randint(250, 500)
 
+    # Atualiza a descida do item e verifica se ele precisa ser reposicionado.
     def update(self, personagem_movendo):
+        # Faz o item descer somente quando o cenário também estiver descendo.
         if personagem_movendo:
             self.rect.y += 3
+        # Sorteia outro item quando o atual passa pelo limite inferior da janela.
         if self.rect.top > HEIGHT:
             self.novo_item()
 
+# Define o arquivo JSON que guarda o recorde na mesma pasta do código.
 ARQUIVO_RECORDE = Path(__file__).resolve().with_name("recorde_pascal.json")
+# Tenta ler o recorde salvo e garante que a pontuação carregada não seja negativa.
 try:
     dados_recorde = json.loads(ARQUIVO_RECORDE.read_text(encoding="utf-8"))
     recorde = max(0, int(dados_recorde["recorde"]))
+# Começa com recorde zero se o arquivo estiver ausente, inválido ou com dados incompatíveis.
 except (OSError, ValueError, TypeError, KeyError):
     recorde = 0
+# Guarda se ocorreu uma falha na tentativa de salvar o recorde.
 erro_recorde = False
 
+# Grava o novo recorde e informa se a operação foi concluída.
 def salvar_recorde(valor):
+    # Tenta escrever a pontuação no arquivo usando o formato JSON.
     try:
         ARQUIVO_RECORDE.write_text(json.dumps({"recorde": valor}), encoding="utf-8")
         return True
+    # Informa a falha se não for possível escrever no arquivo.
     except OSError:
         return False
 
+# Cria o relógio usado para controlar a velocidade de atualização das telas.
 clock = pygame.time.Clock()
 
+# Mantém os laços principais ativos enquanto o jogador não encerrar a execução.
 game = True
 
 # Tela inicial: o jogo só começa depois de apertar ENTER
 tela_inicial = True
 
+# Mantém a tela inicial aberta até o jogador iniciar a partida ou sair.
 while tela_inicial and game:
+    # Limita a atualização da tela inicial a 60 quadros por segundo.
     clock.tick(60)
+    # Percorre os eventos recebidos desde a última atualização da tela inicial.
     for event in pygame.event.get():
+        # Processa as ações somente quando uma tecla é pressionada.
         if event.type == pygame.KEYDOWN:
+            # Fecha a tela inicial e permite começar a primeira fase ao pressionar ENTER.
             if event.key == pygame.K_RETURN:
                 tela_inicial = False
+            # Encerra o jogo se ESC for pressionado na tela inicial.
             elif event.key == pygame.K_ESCAPE:
                 game = False
 
+    # Desenha a parte inferior do cenário como fundo da tela inicial.
     window.blit(background, (0, int(fundo_y)))
 
     # Escurece o cenário para destacar os textos
@@ -408,20 +513,25 @@ while tela_inicial and game:
     sombra.fill((0, 0, 0, 150))
     window.blit(sombra, (0, 0))
 
+    # Prepara as imagens dos textos de título e dos comandos para iniciar ou sair.
     titulo_pascal = font.render("PASCAL", True, (220, 180, 255))
     titulo_nasalturas = font.render("NAS ALTURAS", True, (220, 180, 255))
     texto_iniciar = font_mensagem.render("Pressione ENTER para iniciar", True, (255, 255, 255))
     texto_sair = font_mensagem.render("ESC para sair", True, (255, 255, 255))
 
+    # Posiciona os títulos e comandos no centro horizontal da janela.
     window.blit(titulo_pascal, titulo_pascal.get_rect(center=(WIDTH // 2, 230)))
     window.blit(titulo_nasalturas, titulo_nasalturas.get_rect(center=(WIDTH // 2, 300)))
     window.blit(texto_iniciar, texto_iniciar.get_rect(center=(WIDTH // 2, 420)))
     window.blit(texto_sair, texto_sair.get_rect(center=(WIDTH // 2, 470)))
+    # Prepara a fonte menor e a lista das instruções de controle e dos objetivos das fases.
     font_ajuda = pygame.font.SysFont("Cambria", 21)
     instrucoes = ["Setas para os lados: mover", "ESPAÇO ou seta para cima: pular", "Fase 1: alcance a porta da torre", "Azul: plataforma móvel | Laranja: frágil", "Escudo: evita uma queda | Estrela: superpulo", "Fase 2: alcance a lanterna dourada!",]
+    # Desenha cada instrução em uma linha, com espaçamento vertical de 30 pixels.
     for linha, instrucao in enumerate(instrucoes):
         texto_ajuda = font_ajuda.render(instrucao, True, (255, 255, 255))
         window.blit(texto_ajuda, texto_ajuda.get_rect(center=(WIDTH // 2, 535 + linha * 30)))
+    # Apresenta na janela tudo o que foi desenhado na tela inicial.
     pygame.display.update()
 
 # Cada repetição cria uma nova partida
@@ -441,12 +551,15 @@ while game:
     all_sprites.add(player)
 
     # Criando os matinhos
+    # Percorre as dez fileiras que formarão as primeiras plataformas da fase.
     for i in range(10):
         y = HEIGHT - 140 - i * intervalo_plataformas(fundo_y)
+        # Cria uma plataforma em cada uma das duas metades horizontais da tela.
         for coluna in range(2):
             plataforma = matinho(matinho_img_small, y)
             inicio = coluna * (WIDTH // 2)
             fim = (coluna + 1) * (WIDTH // 2)
+            # Sorteia a posição horizontal dentro da coluna, deixando espaço para toda a plataforma.
             plataforma.rect.x = random.randint(inicio, fim - plataforma.rect.width)
             # O número da fileira define a frequência e o lado da móvel.
             plataforma.configurar(coluna, i)
@@ -454,6 +567,7 @@ while game:
             all_sprites.add(plataforma)
 
     # Mantém a sequência de lados ao criar novas fileiras.
+    # Guarda o número da próxima fileira para manter o padrão de plataformas móveis.
     proxima_linha = 10
 
     # criando o primeiro sol
@@ -464,32 +578,43 @@ while game:
     #pedido do pulo
     pedido_pulo = False
     pontos = pontos_acumulados  # Os pontos da fase 1 continuam na fase 2.
+    # Cria um grupo com um único item especial e inicia seus efeitos como desativados.
     itens = pygame.sprite.GroupSingle(ItemEspecial())
     escudo = False
     tempo_superpulo = 0
+    # Guarda a distância inicial até o objetivo para depois calcular o progresso da subida.
     distancia_inicial_objetivo = max(1, player.rect.centery - (objetivo.centery + fundo_y))
     progresso_maximo = 0
 
+    # Executa os quadros da fase até ocorrer uma derrota, uma chegada ou a saída com ESC.
     while game:
         # aumenta a taxa de atualização para 60 FPS
         clock.tick(60)
+        # Lê os eventos do teclado recebidos durante a partida.
         for event in pygame.event.get():
+            # Verifica se o evento corresponde ao pressionamento de uma tecla.
             if event.type == pygame.KEYDOWN:
+                # Interrompe a partida quando ESC é pressionado.
                 if event.key == pygame.K_ESCAPE:
                     game = False
+                # Registra o pedido de pulo ao pressionar ESPAÇO ou a seta para cima.
                 elif event.key == pygame.K_SPACE or event.key == pygame.K_UP:
                     pedido_pulo = True
 
+        # Sai do laço da fase antes de atualizar os objetos se o jogo foi encerrado.
         if not game:
             break
 
         # movimentação horizontal contínua
         # Isso permite mudar de direção sem precisar apertar várias vezes.
         teclas = pygame.key.get_pressed()
+        # Move Pascal para a esquerda enquanto a seta esquerda estiver pressionada.
         if teclas[pygame.K_LEFT]:
             player.speedx = -5
+        # Move Pascal para a direita enquanto a seta direita estiver pressionada.
         elif teclas[pygame.K_RIGHT]:
             player.speedx = 5
+        # Zera a velocidade horizontal quando nenhuma das duas direções é escolhida.
         else:
             player.speedx = 0
 
@@ -505,8 +630,10 @@ while game:
         # Guarda o topo visível de cada plataforma
         topos_antes = {}
 
+        # Guarda a altura de apoio de cada plataforma antes de movimentá-la.
         for plataforma in plataformas:
             area = plataforma.image.get_bounding_rect()
+            # Usa o centro vertical da área visível do matinho como altura de apoio.
             topos_antes[plataforma] = (plataforma.rect.y + area.centery)
 
         # Movimenta o personagem e as plataformas
@@ -515,16 +642,22 @@ while game:
         plataformas.update(personagem_movendo)
 
         # movimenta os sóis
+        # Atualiza as posições dos sóis e dos itens conforme o movimento do cenário.
         sois.update(personagem_movendo)
         itens.update(personagem_movendo)
+        # Reduz, a cada quadro, o tempo restante do efeito de superpulo.
         if tempo_superpulo > 0:
             tempo_superpulo -= 1
+        # Verifica se o retângulo do personagem encostou no item especial.
         if pygame.sprite.spritecollide(player, itens, False):
             item = itens.sprite
+            # Ativa o escudo quando esse for o tipo do item coletado.
             if item.tipo == "escudo":
                 escudo = True
+            # Ativa oito segundos de superpulo quando uma estrela é coletada.
             else:
                 tempo_superpulo = 8 * 60
+            # Reproduz o som de coleta e reposiciona o item com um novo sorteio.
             tocar_som("sol")
             item.novo_item()
 
@@ -538,26 +671,34 @@ while game:
         # Retângulo da parte visível do personagem na tela
         corpo = area_player.move(player.rect.x, player.rect.y)
         plataforma_pouso = None
+        # Inicia a busca da plataforma que será atingida primeiro durante a queda.
         primeiro_instante = float("inf")
 
+        # Compara o corpo visível de Pascal com as plataformas ativas.
         for plataforma in plataformas:
+            # Ignora as plataformas que já desapareceram.
             if not plataforma.ativa:
                 continue
+            # Calcula a área visível de apoio e verifica a sobreposição na horizontal.
             area = plataforma.image.get_bounding_rect()
             apoio = area.move(plataforma.rect.x, plataforma.rect.y)
             sobrepoe_x = (corpo.right > apoio.left and corpo.left < apoio.right)
+            # Compara a distância dos pés até o apoio antes e depois do movimento.
             distancia_antes = (topos_antes[plataforma] - pes_antes)
             distancia_depois = (apoio.centery - corpo.bottom)
 
             # Verifica se os pés alcançaram a plataforma por cima
             if (sobrepoe_x and distancia_antes >= 0 and distancia_depois <= 0 and player.speedy >= 0):
                 movimento = distancia_antes - distancia_depois
+                # Só calcula o instante de contato quando a distância até a plataforma diminuiu.
                 if movimento > 0:
                     instante = distancia_antes / movimento
+                    # Guarda o contato mais cedo para evitar escolher uma plataforma atravessada depois.
                     if instante < primeiro_instante:
                         primeiro_instante = instante
                         plataforma_pouso = plataforma
 
+        # Se houve pouso, corrige a posição dos pés e atualiza o estado de apoio.
         if plataforma_pouso is not None:
             area = plataforma_pouso.image.get_bounding_rect()
             topo = plataforma_pouso.rect.y + area.centery
@@ -565,12 +706,15 @@ while game:
             player.rect.y = topo - area_player.bottom
             player.speedy = 0
             player.no_chao = True
+            # Faz Pascal acompanhar o deslocamento horizontal da plataforma em que pousou.
             player.rect.x += plataforma_pouso.delta_x
+            # Inicia a contagem de 30 quadros para uma plataforma frágil desaparecer após o pouso.
             if plataforma_pouso.tipo == "fragil" and plataforma_pouso.tempo_sumir is None:
                 plataforma_pouso.tempo_sumir = 30  # some meio segundo após o pouso
 
         # Derrota quando o personagem toca o chão
         if player.rect.bottom >= HEIGHT:
+            # Se houver escudo, consome a proteção e lança Pascal para cima em vez de encerrar a fase.
             if escudo:
                 escudo = False
                 player.rect.bottom = HEIGHT - 10
@@ -578,6 +722,7 @@ while game:
                 player.no_chao = False
                 pedido_pulo = False
                 tocar_som("pulo")
+            # Sem escudo, registra a derrota, reproduz seu som e encerra o laço da fase.
             else:
                 resultado = "game_over"
                 tocar_som("game_over")
@@ -592,6 +737,7 @@ while game:
 
         # Para a luz, ignora as margens transparentes da imagem na colisão.
         area_objetivo = objetivo_tela
+        # Usa a parte mais opaca da lanterna, sem as margens transparentes, como área de chegada.
         if luz_img is not None:
             area_objetivo = luz_img.get_bounding_rect(100).move(objetivo_tela.topleft)
 
@@ -599,17 +745,23 @@ while game:
         if corpo.colliderect(area_objetivo):
             tocar_som("vitoria")
             entrou = animar_entrada(player, objetivo_tela, fundo_y, plataformas, sois, itens, pontos)
+            # Se ESC interrompeu a animação, encerra sem exibir uma tela de resultado.
             if not entrou:
                 resultado = None
+            # Se ainda existe outra fase, registra a conclusão desta fase para permitir avançar.
             elif fase_atual < len(FASES) - 1:
                 resultado = "fase_concluida"
+            # Na última fase, registra a vitória completa do jogo.
             else:
                 resultado = "vitoria"
+            # Encerra o laço da fase para mostrar o resultado ou finalizar a execução.
             game = False
             break
 
+        # Executa o pedido de pulo somente quando Pascal estiver apoiado.
         if player.no_chao and pedido_pulo:
            #executa o pulo assim q o jogador tocar no mato
+            # Escolhe a velocidade de pulo normal ou a velocidade maior do superpulo.
             player.speedy = -19 if tempo_superpulo > 0 else -15
             tocar_som("pulo")
             player.no_chao = False 
@@ -620,14 +772,18 @@ while game:
         # Agrupa as plataformas que estão na mesma altura
         linhas = {}
 
+        # Agrupa as plataformas pela altura para reaproveitar cada dupla da mesma fileira.
         for plataforma in plataformas:
             y = plataforma.rect.y
             linhas.setdefault(y, []).append(plataforma)
 
         # Reposiciona cada dupla que saiu por baixo
         for y, linha in linhas.items():
+            # Reposiciona apenas as fileiras que já passaram pelo limite inferior da janela.
             if y > HEIGHT:
+                # Calcula a nova altura acima da plataforma mais alta, respeitando o espaçamento da fase.
                 novo_y = min(plataforma.rect.y for plataforma in plataformas) - intervalo_plataformas(fundo_y)
+                # Sorteia novas posições por coluna e reconfigura o tipo de cada plataforma reaproveitada.
                 for coluna, plataforma in enumerate(linha):
                     inicio = coluna * (WIDTH // 2)
                     fim = (coluna + 1) * (WIDTH // 2)
@@ -635,6 +791,7 @@ while game:
                     plataforma.rect.y = novo_y
                     plataforma.top_anterior = novo_y
                     plataforma.configurar(coluna, proxima_linha)
+                # Avança o contador de fileiras depois de reposicionar a dupla.
                 proxima_linha += 1
 
         # verifica se o jogador coletou o sol
@@ -650,18 +807,24 @@ while game:
 
         # desenha os sóis
         sois.draw(window)
+        # Desenha os itens especiais e a lanterna da segunda fase antes do personagem.
         itens.draw(window)
         desenhar_luz(window, objetivo_tela)
 
         # Desenha o personagem por último
         player.desenhar(window)
+        # Mostra um círculo azul ao redor de Pascal enquanto o escudo estiver ativo.
         if escudo:
             pygame.draw.circle(window, (90, 210, 255), player.rect.center, 53, 3)
+        # Monta a lista de mensagens dos efeitos que estão ativos no momento.
         efeitos = []
+        # Inclui a indicação de escudo ativo na lista de mensagens.
         if escudo:
             efeitos.append("Escudo ativo")
+        # Converte os quadros restantes do superpulo em segundos para mostrar na tela.
         if tempo_superpulo > 0:
             efeitos.append(f"Superpulo: {math.ceil(tempo_superpulo / 60)}s")
+        # Se houver efeitos ativos, junta suas mensagens e as desenha abaixo do recorde.
         if efeitos:
             texto_efeitos = font_mensagem.render(" | ".join(efeitos), True, (255, 230, 110))
             window.blit(texto_efeitos, (15, 90))
@@ -670,26 +833,34 @@ while game:
         distancia_objetivo = max(0, player.rect.centery - (objetivo.centery + fundo_y))
         progresso = max(0, min(0.99, 1 - distancia_objetivo / distancia_inicial_objetivo))
         progresso_maximo = max(progresso_maximo, progresso)
+        # Cria o retângulo de fundo da barra de progresso e calcula sua parte preenchida.
         barra = pygame.Rect(WIDTH - 170, 20, 150, 16)
         pygame.draw.rect(window, (35, 25, 50), barra, border_radius=8)
         preenchimento = barra.copy()
         preenchimento.width = round(barra.width * progresso_maximo)
+        # Desenha o preenchimento da barra somente quando sua largura for maior que zero.
         if preenchimento.width > 0:
             pygame.draw.rect(window, (190, 135, 245), preenchimento, border_radius=8)
+        # Escolhe Torre ou Céu para identificar o percurso e prepara o texto de porcentagem.
         nome_progresso = "Torre" if luz_img is None else "Céu"
         texto_progresso = font_mensagem.render(f"{nome_progresso}: {int(progresso_maximo * 100)}%", True, (255, 255, 255))
         window.blit(texto_progresso, texto_progresso.get_rect(topright=(WIDTH - 15, 44)))
+        # Prepara e desenha a pontuação atual e o maior valor entre o recorde e os pontos da partida.
         texto_pontos = font_pontos.render(f'Pontos: {pontos}',True,(128, 0, 128))
         window.blit(texto_pontos, (15, 15))
         texto_recorde = font_mensagem.render(f"Recorde: {max(recorde, pontos)}", True, (255, 255, 255))
         window.blit(texto_recorde, (15, 55))
+        # Mostra o número da fase atual, somando um ao índice que começa em zero.
         texto_fase = font_mensagem.render(f"Fase {fase_atual + 1}/{len(FASES)}", True, (255, 255, 255))
         window.blit(texto_fase, (15, HEIGHT - 35))
+        # Exibe o objetivo específico da segunda fase enquanto a lanterna estiver sendo usada.
         if luz_img is not None:
             aviso_objetivo = font_ajuda.render("Alcance a lanterna dourada!", True, (255, 230, 140))
             window.blit(aviso_objetivo, aviso_objetivo.get_rect(center=(WIDTH // 2, HEIGHT - 55)))
+        # Mostra o quadro completo da partida depois de desenhar todos os elementos.
         pygame.display.update()
 
+    # Atualiza e tenta salvar o recorde quando a fase terminou com uma pontuação maior.
     if resultado is not None and pontos > recorde:
         recorde = pontos
         erro_recorde = not salvar_recorde(recorde)
@@ -697,24 +868,35 @@ while game:
     # Tela final: aparece apenas em caso de vitória ou queda
     tela_final = resultado is not None
 
+    # Mantém a tela de resultado aberta até o jogador continuar ou sair.
     while tela_final:
+        # Limita a atualização da tela de resultado a 60 quadros por segundo.
         clock.tick(60)
+        # Lê os comandos recebidos na tela de conclusão, vitória ou derrota.
         for event in pygame.event.get():
+            # Aceita os comandos de continuação ou saída quando uma tecla é pressionada.
             if event.type == pygame.KEYDOWN:
+                # Fecha a tela de resultado e encerra o jogo ao pressionar ESC.
                 if event.key == pygame.K_ESCAPE:
                     tela_final = False
                     game = False
+                # Continua o jogo ao pressionar ENTER, avançando ou reiniciando conforme o resultado.
                 elif event.key == pygame.K_RETURN:
+                    # Avança uma fase e leva os pontos conquistados quando a fase anterior foi concluída.
                     if resultado == "fase_concluida":
                         fase_atual += 1
                         pontos_acumulados = pontos
                     else:
                         # Após derrota ou vitória final, reinicia da fase 1.
+                        # Seleciona a primeira fase, representada pelo índice zero.
                         fase_atual = 0
+                        # Zera os pontos que poderão ser levados de uma fase para a outra.
                         pontos_acumulados = 0
+                    # Fecha a tela de resultado e permite que o laço externo prepare a próxima partida.
                     tela_final = False
                     game = True
 
+        # Interrompe o desenho desta tela assim que ela for fechada pelo jogador.
         if not tela_final:
             break
 
@@ -726,39 +908,50 @@ while game:
         sombra.fill((0, 0, 0, 170))
         window.blit(sombra, (0, 0))
 
+        # Prepara o título, a mensagem e a cor da conclusão de uma fase intermediária.
         if resultado == "fase_concluida":
             titulo = f"FASE {fase_atual + 1} CONCLUÍDA!"
             mensagem = "Agora alcance a lanterna dourada!"
             cor = (255, 220, 100)
+        # Prepara a mensagem de vitória após Pascal alcançar a lanterna dourada.
         elif resultado == "vitoria":
             titulo = "VITÓRIA!"
             mensagem = "Pascal alcançou a luz!"
             cor = (255, 220, 100)
+        # Prepara o título e a mensagem de derrota quando Pascal cair sem proteção.
         else:
             titulo = "GAME OVER"
             mensagem = "Pascal caiu no chão!"
             cor = (255, 130, 130)
 
+        # Escolhe uma fonte menor para o título mais comprido de conclusão de fase.
         fonte_titulo = font_pontos if resultado == "fase_concluida" else font_final
         texto_titulo = fonte_titulo.render(titulo, True, cor)
         texto_mensagem = font_mensagem.render(mensagem, True, (255, 255, 255))
         texto_final = font_pontos.render(f"Pontuação final: {pontos}", True, (255, 255, 255))
+        # Mostra o comando para avançar quando ainda houver outra fase.
         if resultado == "fase_concluida":
             comando = "ENTER para a próxima fase"
+        # Após derrota ou vitória final, mostra o comando para jogar novamente desde a fase 1.
         else:
             comando = "ENTER para jogar novamente"
+        # Transforma os comandos de reinício e saída em imagens de texto.
         texto_reiniciar = font_mensagem.render(comando, True, (255, 255, 255))
         texto_sair = font_mensagem.render("Pressione ESC para sair", True, (255, 255, 255))
 
+        # Desenha o título, a mensagem e a pontuação final nas posições definidas.
         window.blit(texto_titulo, texto_titulo.get_rect(center=(WIDTH // 2, 250)))
         window.blit(texto_mensagem, texto_mensagem.get_rect(center=(WIDTH // 2, 325)))
         window.blit(texto_final,texto_final.get_rect(center=(WIDTH // 2, 400)))
+        # Acrescenta um aviso ao recorde quando sua gravação falhou.
         aviso_recorde = " (não salvo)" if erro_recorde else ""
         texto_recorde = font_mensagem.render(f"Recorde: {recorde}{aviso_recorde}", True, (255, 220, 100))
+        # Desenha o recorde e os comandos de continuação e saída.
         window.blit(texto_recorde, texto_recorde.get_rect(center=(WIDTH // 2, 440)))
         window.blit(texto_reiniciar, texto_reiniciar.get_rect(center=(WIDTH // 2, 490)))
         window.blit(texto_sair,texto_sair.get_rect(center=(WIDTH // 2, 520)))
 
         pygame.display.update()
 
+# Libera os recursos do Pygame e fecha sua janela ao terminar a execução.
 pygame.quit()
